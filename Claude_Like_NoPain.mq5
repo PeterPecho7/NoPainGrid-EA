@@ -50,7 +50,7 @@ input int      InpMagicNumber    = 2262642;       // Magické číslo
 input group "=== ČASOVÉ FILTRE ==="
 input int      InpStartHour      = 0;             // Začiatok obchodovania
 input int      InpEndHour        = 23;            // Koniec obchodovania
-input bool     InpTradeFriday    = false;         // Obchodovať v piatok? (false = bezpečnejšie)
+input bool     InpTradeFriday    = true;          // Obchodovať v piatok?
 
 //--- VSTUPNÉ SIGNÁLY
 input group "=== VSTUPNÉ SIGNÁLY ==="
