@@ -4,20 +4,35 @@
 //|  VERZIA S MONITORINGOM                                           |
 //|  ======================                                           |
 //|  Táto verzia obsahuje:                                           |
-//|  - Telegram notifikácie                                          |
+//|  - Discord notifikácie (webhook)                                 |
 //|  - MT5 Push notifikácie na mobil                                 |
+//|  - Email notifikácie                                             |
 //|  - Denný report                                                  |
 //|  - Heartbeat monitoring (kontrola že EA beží)                    |
 //|                                                                   |
-//|  NASTAVENIE TELEGRAMU:                                           |
-//|  1. Vytvor bota cez @BotFather na Telegrame                      |
-//|  2. Získaj Bot Token (napr. 123456:ABC-DEF...)                   |
-//|  3. Získaj Chat ID cez @userinfobot                              |
-//|  4. Zadaj tieto údaje do nastavení EA                            |
+//|  NASTAVENIE DISCORD:                                             |
+//|  1. Vytvor Discord server alebo použi existujúci                 |
+//|  2. Vytvor kanál pre notifikácie (napr. #trading-alerts)         |
+//|  3. Klikni na ozubené koliesko pri kanáli -> Integrations        |
+//|  4. Klikni "Create Webhook" a skopíruj URL                       |
+//|  5. Zadaj URL do nastavení EA                                    |
+//|                                                                   |
+//|  NASTAVENIE MT5 PUSH:                                            |
+//|  1. Stiahni MetaTrader 5 app na mobil                            |
+//|  2. V app choď do Settings -> Messages                           |
+//|  3. Nájdi MetaQuotes ID (8 znakov)                               |
+//|  4. V MT5 PC: Tools -> Options -> Notifications                  |
+//|  5. Zadaj MetaQuotes ID a zapni notifikácie                      |
+//|                                                                   |
+//|  NASTAVENIE EMAIL:                                               |
+//|  1. V MT5: Tools -> Options -> Email                             |
+//|  2. Zadaj SMTP server (napr. smtp.gmail.com:465)                 |
+//|  3. Zadaj email a heslo (pre Gmail použi App Password)           |
+//|  4. Otestuj tlačidlom Test                                       |
 //+------------------------------------------------------------------+
 #property copyright "Based on NoPain MT5 Signal + Monitoring"
 #property version   "3.00"
-#property description "Grid/Martingale EA s Telegram monitoringom"
+#property description "Grid/Martingale EA s Discord/Email/Push monitoringom"
 #property strict
 
 #include <Trade\Trade.mqh>
@@ -54,26 +69,32 @@ input int      InpRSIOverbought  = 70;            // RSI prekúpená úroveň
 input int      InpRSIOversold    = 30;            // RSI prepredaná úroveň
 input ENUM_TIMEFRAMES InpTimeframe = PERIOD_H1;   // Časový rámec
 
-//--- MONITORING NASTAVENIA
-input group "=== TELEGRAM MONITORING ==="
-input bool     InpUseTelegram    = true;          // Používať Telegram notifikácie
-input string   InpTelegramToken  = "";            // Telegram Bot Token (od @BotFather)
-input string   InpTelegramChatID = "";            // Telegram Chat ID (od @userinfobot)
+//--- DISCORD MONITORING
+input group "=== DISCORD WEBHOOK ==="
+input bool     InpUseDiscord     = true;          // Používať Discord notifikácie
+input string   InpDiscordWebhook = "";            // Discord Webhook URL (celá URL)
 
+//--- MT5 PUSH NOTIFIKÁCIE
 input group "=== MT5 PUSH NOTIFIKÁCIE ==="
-input bool     InpUsePush        = true;          // Používať MT5 Push notifikácie
-input bool     InpUseEmail       = false;         // Používať Email notifikácie
+input bool     InpUsePush        = true;          // Používať MT5 Push notifikácie (nastav MetaQuotes ID v Options)
 
-input group "=== TYPY NOTIFIKÁCIÍ ==="
-input bool     InpNotifyTrade    = true;          // Notifikovať pri otvorení/zatvorení obchodu
-input bool     InpNotifyProfit   = true;          // Notifikovať pri dosiahnutí TP
+//--- EMAIL NOTIFIKÁCIE
+input group "=== EMAIL NOTIFIKÁCIE ==="
+input bool     InpUseEmail       = true;          // Používať Email notifikácie (nastav SMTP v Options)
+
+//--- TYPY NOTIFIKÁCIÍ
+input group "=== ČO NOTIFIKOVAŤ ==="
+input bool     InpNotifyStart    = true;          // Notifikovať pri štarte/zastavení EA
+input bool     InpNotifyTrade    = true;          // Notifikovať pri otvorení obchodu
+input bool     InpNotifyProfit   = true;          // Notifikovať pri zatvorení (profit/strata)
 input bool     InpNotifyDrawdown = true;          // Notifikovať pri vysokom drawdowne
 input bool     InpNotifyDaily    = true;          // Denný report (o 23:00)
 input bool     InpNotifyHeartbeat= true;          // Heartbeat každú hodinu
 
-input group "=== UPOZORNENIA ==="
-input double   InpAlertDrawdown  = 10.0;          // Upozorniť pri drawdowne % (pred max)
-input double   InpAlertProfit    = 50.0;          // Upozorniť pri profite $ (denne)
+//--- PRAHY UPOZORNENÍ
+input group "=== PRAHY UPOZORNENÍ ==="
+input double   InpAlertDrawdown  = 10.0;          // Upozorniť pri drawdowne % (varovanie pred max)
+input int      InpHeartbeatHour  = 1;             // Heartbeat každých X hodín (1-24)
 
 //+------------------------------------------------------------------+
 //| GLOBÁLNE PREMENNÉ                                                 |
@@ -101,13 +122,14 @@ int            buyLevels = 0;
 int            sellLevels = 0;
 
 //--- Monitoring premenné
-datetime       lastHeartbeat = 0;      // Čas posledného heartbeatu
-datetime       lastDailyReport = 0;    // Čas posledného denného reportu
-double         dailyStartBalance = 0;  // Zostatok na začiatku dňa
-int            dailyTrades = 0;        // Počet obchodov dnes
-double         dailyProfit = 0;        // Profit dnes
-int            totalTradesSession = 0; // Celkový počet obchodov v session
-double         maxDrawdownToday = 0;   // Max drawdown dnes
+datetime       lastHeartbeat = 0;
+datetime       lastDailyReport = 0;
+datetime       lastDDAlert = 0;
+double         dailyStartBalance = 0;
+int            dailyTrades = 0;
+double         dailyProfit = 0;
+int            totalTradesSession = 0;
+double         maxDrawdownToday = 0;
 
 //+------------------------------------------------------------------+
 //| INICIALIZÁCIA                                                     |
@@ -149,22 +171,19 @@ int OnInit()
    ArrayResize(sellGrid, InpMaxGridLevels);
 
    //--- Notifikácia o štarte
-   string startMsg = StringFormat(
-      "🟢 EA SPUSTENÝ\n" +
-      "━━━━━━━━━━━━━━━\n" +
-      "Symbol: %s\n" +
-      "Zostatok: $%.2f\n" +
-      "Lot: %.2f\n" +
-      "Grid: %d pips\n" +
-      "Max DD: %.1f%%\n" +
-      "━━━━━━━━━━━━━━━",
-      symbol,
-      initialBalance,
-      InpLotSize,
-      InpGridStepPips,
-      InpMaxDrawdownPct
-   );
-   SendNotification_All(startMsg);
+   if(InpNotifyStart)
+   {
+      string startMsg =
+         ":green_circle: **EA SPUSTENÝ**\n" +
+         "```\n" +
+         "Symbol:    " + symbol + "\n" +
+         "Zostatok:  $" + DoubleToString(initialBalance, 2) + "\n" +
+         "Lot:       " + DoubleToString(InpLotSize, 2) + "\n" +
+         "Grid:      " + IntegerToString(InpGridStepPips) + " pips\n" +
+         "Max DD:    " + DoubleToString(InpMaxDrawdownPct, 1) + "%\n" +
+         "```";
+      SendNotification_All("EA SPUSTENÝ", startMsg);
+   }
 
    Print("NoPain Grid EA v3 (Monitoring) inicializovaný");
    return(INIT_SUCCEEDED);
@@ -179,20 +198,19 @@ void OnDeinit(const int reason)
       IndicatorRelease(handleRSI);
 
    //--- Notifikácia o zastavení
-   string stopMsg = StringFormat(
-      "🔴 EA ZASTAVENÝ\n" +
-      "━━━━━━━━━━━━━━━\n" +
-      "Dôvod: %s\n" +
-      "Zostatok: $%.2f\n" +
-      "Session P/L: $%.2f\n" +
-      "Obchodov: %d\n" +
-      "━━━━━━━━━━━━━━━",
-      GetDeinitReasonText(reason),
-      AccountInfoDouble(ACCOUNT_BALANCE),
-      AccountInfoDouble(ACCOUNT_BALANCE) - initialBalance,
-      totalTradesSession
-   );
-   SendNotification_All(stopMsg);
+   if(InpNotifyStart)
+   {
+      double sessionPL = AccountInfoDouble(ACCOUNT_BALANCE) - initialBalance;
+      string stopMsg =
+         ":red_circle: **EA ZASTAVENÝ**\n" +
+         "```\n" +
+         "Dôvod:     " + GetDeinitReasonText(reason) + "\n" +
+         "Zostatok:  $" + DoubleToString(AccountInfoDouble(ACCOUNT_BALANCE), 2) + "\n" +
+         "Session:   " + (sessionPL >= 0 ? "+" : "") + DoubleToString(sessionPL, 2) + "$\n" +
+         "Obchodov:  " + IntegerToString(totalTradesSession) + "\n" +
+         "```";
+      SendNotification_All("EA ZASTAVENÝ", stopMsg);
+   }
 }
 
 //+------------------------------------------------------------------+
@@ -239,100 +257,147 @@ void OnTick()
 }
 
 //+------------------------------------------------------------------+
-//| TELEGRAM NOTIFIKÁCIA                                              |
-//| Pošle správu cez Telegram Bot API                                |
+//| DISCORD WEBHOOK NOTIFIKÁCIA                                       |
+//| Pošle správu cez Discord Webhook                                 |
 //+------------------------------------------------------------------+
-bool SendTelegram(string message)
+bool SendDiscord(string message)
 {
-   if(!InpUseTelegram || InpTelegramToken == "" || InpTelegramChatID == "")
+   if(!InpUseDiscord || InpDiscordWebhook == "")
       return false;
 
-   //--- Escapovanie špeciálnych znakov pre URL
-   string encodedMsg = message;
-   StringReplace(encodedMsg, " ", "%20");
-   StringReplace(encodedMsg, "\n", "%0A");
-   StringReplace(encodedMsg, "#", "%23");
-   StringReplace(encodedMsg, "&", "%26");
+   //--- Vytvorenie JSON payload pre Discord
+   //    Discord webhook očakáva JSON s "content" alebo "embeds"
+   string jsonPayload = "{\"content\": \"" + EscapeJsonString(message) + "\"}";
 
-   //--- Vytvorenie URL pre Telegram API
-   string url = StringFormat(
-      "https://api.telegram.org/bot%s/sendMessage?chat_id=%s&text=%s&parse_mode=HTML",
-      InpTelegramToken,
-      InpTelegramChatID,
-      encodedMsg
-   );
+   //--- Konverzia na char array
+   char postData[];
+   char result[];
+   string headers = "Content-Type: application/json\r\n";
 
-   //--- Odoslanie HTTP požiadavky
-   char post[], result[];
-   string headers;
+   StringToCharArray(jsonPayload, postData, 0, StringLen(jsonPayload));
+
+   //--- Odoslanie HTTP POST požiadavky
    int timeout = 5000;
+   string resultHeaders;
 
-   int res = WebRequest("GET", url, "", timeout, post, result, headers);
+   int res = WebRequest(
+      "POST",
+      InpDiscordWebhook,
+      headers,
+      timeout,
+      postData,
+      result,
+      resultHeaders
+   );
 
    if(res == -1)
    {
       int error = GetLastError();
       if(error == 4014)
-         Print("TELEGRAM: Pridaj URL do povolených: Tools -> Options -> Expert Advisors -> Allow WebRequest for: api.telegram.org");
+         Print("DISCORD: Pridaj URL do povolených: Tools -> Options -> Expert Advisors -> Allow WebRequest for: discord.com");
       else
-         Print("TELEGRAM: Chyba ", error);
+         Print("DISCORD: Chyba ", error);
       return false;
    }
 
-   return true;
+   //--- Discord vracia 204 No Content pri úspechu
+   if(res == 204 || res == 200)
+      return true;
+
+   Print("DISCORD: HTTP response code: ", res);
+   return false;
+}
+
+//+------------------------------------------------------------------+
+//| ESCAPE JSON STRING                                                |
+//| Escapuje špeciálne znaky pre JSON                                |
+//+------------------------------------------------------------------+
+string EscapeJsonString(string text)
+{
+   string result = text;
+   StringReplace(result, "\\", "\\\\");
+   StringReplace(result, "\"", "\\\"");
+   StringReplace(result, "\n", "\\n");
+   StringReplace(result, "\r", "\\r");
+   StringReplace(result, "\t", "\\t");
+   return result;
 }
 
 //+------------------------------------------------------------------+
 //| MT5 PUSH NOTIFIKÁCIA                                              |
 //| Pošle notifikáciu do MT5 mobilnej aplikácie                      |
+//| Vyžaduje nastavenie MetaQuotes ID v MT5: Tools->Options->Notif.  |
 //+------------------------------------------------------------------+
 bool SendPushNotification(string message)
 {
    if(!InpUsePush)
       return false;
 
-   //--- MT5 Push notifikácia (vyžaduje nastavenie v MT5 -> Tools -> Options -> Notifications)
-   return SendNotification(message);
+   //--- Orezanie správy (push má limit ~255 znakov)
+   string shortMsg = message;
+   if(StringLen(shortMsg) > 250)
+      shortMsg = StringSubstr(message, 0, 247) + "...";
+
+   //--- Odstránenie Discord formátovania pre push
+   StringReplace(shortMsg, ":green_circle:", "[OK]");
+   StringReplace(shortMsg, ":red_circle:", "[!]");
+   StringReplace(shortMsg, ":chart_with_upwards_trend:", "[+]");
+   StringReplace(shortMsg, ":moneybag:", "[$]");
+   StringReplace(shortMsg, ":warning:", "[!]");
+   StringReplace(shortMsg, ":heartbeat:", "[♥]");
+   StringReplace(shortMsg, ":bar_chart:", "[#]");
+   StringReplace(shortMsg, "```", "");
+   StringReplace(shortMsg, "**", "");
+
+   return SendNotification(shortMsg);
 }
 
 //+------------------------------------------------------------------+
 //| EMAIL NOTIFIKÁCIA                                                 |
+//| Pošle email (vyžaduje nastavenie SMTP v MT5: Tools->Options->Email)|
 //+------------------------------------------------------------------+
-bool SendEmailNotification(string subject, string message)
+bool SendEmailNotification(string subject, string body)
 {
    if(!InpUseEmail)
       return false;
 
-   //--- Email (vyžaduje nastavenie v MT5 -> Tools -> Options -> Email)
-   return SendMail(subject, message);
+   //--- Odstránenie Discord formátovania pre email
+   string cleanBody = body;
+   StringReplace(cleanBody, ":green_circle:", "[OK]");
+   StringReplace(cleanBody, ":red_circle:", "[STOP]");
+   StringReplace(cleanBody, ":chart_with_upwards_trend:", "[TRADE]");
+   StringReplace(cleanBody, ":moneybag:", "[PROFIT]");
+   StringReplace(cleanBody, ":warning:", "[WARNING]");
+   StringReplace(cleanBody, ":heartbeat:", "[HEARTBEAT]");
+   StringReplace(cleanBody, ":bar_chart:", "[REPORT]");
+   StringReplace(cleanBody, "```", "");
+   StringReplace(cleanBody, "**", "");
+   StringReplace(cleanBody, "\\n", "\n");
+
+   return SendMail("NoPain EA: " + subject, cleanBody);
 }
 
 //+------------------------------------------------------------------+
 //| UNIVERZÁLNA NOTIFIKÁCIA - POŠLE VŠETKÝMI KANÁLMI                 |
 //+------------------------------------------------------------------+
-void SendNotification_All(string message)
+void SendNotification_All(string subject, string message)
 {
-   //--- Telegram
-   SendTelegram(message);
+   //--- Discord (plná správa s formátovaním)
+   SendDiscord(message);
 
-   //--- MT5 Push (skrátiť pre push)
-   string shortMsg = message;
-   if(StringLen(shortMsg) > 200)
-   {
-      shortMsg = StringSubstr(message, 0, 197) + "...";
-   }
-   SendPushNotification(shortMsg);
+   //--- MT5 Push (skrátená verzia)
+   SendPushNotification(subject + ": " + message);
 
-   //--- Email
-   SendEmailNotification("NoPain Grid EA", message);
+   //--- Email (čistý text)
+   SendEmailNotification(subject, message);
 
-   //--- Log
-   Print("NOTIFIKÁCIA: ", message);
+   //--- Log do terminálu
+   Print("NOTIFIKÁCIA [", subject, "]: ", StringSubstr(message, 0, 100), "...");
 }
 
 //+------------------------------------------------------------------+
 //| HEARTBEAT - KONTROLA ŽE EA BEŽÍ                                  |
-//| Každú hodinu pošle správu že EA je aktívny                       |
+//| Pošle správu každých X hodín                                     |
 //+------------------------------------------------------------------+
 void CheckHeartbeat()
 {
@@ -343,31 +408,31 @@ void CheckHeartbeat()
    MqlDateTime dt;
    TimeToStruct(currentTime, dt);
 
-   //--- Heartbeat na začiatku každej hodiny (minúta 0)
-   if(dt.min == 0 && currentTime - lastHeartbeat > 3500) // 3500 sekúnd = skoro hodina
+   //--- Heartbeat podľa nastaveného intervalu
+   int heartbeatInterval = InpHeartbeatHour * 3600; // v sekundách
+
+   if(currentTime - lastHeartbeat >= heartbeatInterval)
    {
       lastHeartbeat = currentTime;
 
       double equity = AccountInfoDouble(ACCOUNT_EQUITY);
       double balance = AccountInfoDouble(ACCOUNT_BALANCE);
       double floatingPL = equity - balance;
+      double currentDD = (balance > 0) ? ((balance - equity) / balance * 100) : 0;
       int openPositions = GetPositionCount();
 
-      string heartbeatMsg = StringFormat(
-         "💓 HEARTBEAT %02d:00\n" +
-         "Zostatok: $%.2f\n" +
-         "Equity: $%.2f\n" +
-         "Floating: %s$%.2f\n" +
-         "Pozície: %d",
-         dt.hour,
-         balance,
-         equity,
-         (floatingPL >= 0 ? "+" : ""),
-         floatingPL,
-         openPositions
-      );
+      string heartbeatMsg =
+         ":heartbeat: **HEARTBEAT** " + TimeToString(currentTime, TIME_DATE|TIME_MINUTES) + "\n" +
+         "```\n" +
+         "Zostatok:  $" + DoubleToString(balance, 2) + "\n" +
+         "Equity:    $" + DoubleToString(equity, 2) + "\n" +
+         "Floating:  " + (floatingPL >= 0 ? "+" : "") + DoubleToString(floatingPL, 2) + "$\n" +
+         "Drawdown:  " + DoubleToString(currentDD, 2) + "%\n" +
+         "Pozície:   " + IntegerToString(openPositions) + "\n" +
+         "```";
 
-      SendTelegram(heartbeatMsg);  // Len Telegram pre heartbeat
+      //--- Heartbeat len cez Discord (menej spam na mobil)
+      SendDiscord(heartbeatMsg);
    }
 }
 
@@ -393,25 +458,22 @@ void CheckDailyReport()
       double dayPL = currentBalance - dailyStartBalance;
       double dayPLPercent = (dailyStartBalance > 0) ? (dayPL / dailyStartBalance * 100) : 0;
 
-      string reportMsg = StringFormat(
-         "📊 DENNÝ REPORT\n" +
-         "━━━━━━━━━━━━━━━\n" +
-         "Dátum: %04d-%02d-%02d\n" +
-         "Zostatok: $%.2f\n" +
-         "Denný P/L: %s$%.2f (%.2f%%)\n" +
-         "Obchodov: %d\n" +
-         "Max DD: %.2f%%\n" +
-         "━━━━━━━━━━━━━━━",
-         dt.year, dt.mon, dt.day,
-         currentBalance,
-         (dayPL >= 0 ? "+" : ""),
-         dayPL,
-         dayPLPercent,
-         dailyTrades,
-         maxDrawdownToday
-      );
+      string emoji = (dayPL >= 0) ? ":chart_with_upwards_trend:" : ":chart_with_downwards_trend:";
 
-      SendNotification_All(reportMsg);
+      string reportMsg =
+         ":bar_chart: **DENNÝ REPORT**\n" +
+         "```\n" +
+         "Dátum:     " + IntegerToString(dt.year) + "-" +
+                         StringFormat("%02d", dt.mon) + "-" +
+                         StringFormat("%02d", dt.day) + "\n" +
+         "Zostatok:  $" + DoubleToString(currentBalance, 2) + "\n" +
+         "Denný P/L: " + (dayPL >= 0 ? "+" : "") + DoubleToString(dayPL, 2) +
+                    "$ (" + DoubleToString(dayPLPercent, 2) + "%)\n" +
+         "Obchodov:  " + IntegerToString(dailyTrades) + "\n" +
+         "Max DD:    " + DoubleToString(maxDrawdownToday, 2) + "%\n" +
+         "```";
+
+      SendNotification_All("DENNÝ REPORT", reportMsg);
 
       //--- Reset denných počítadiel
       dailyStartBalance = currentBalance;
@@ -423,7 +485,6 @@ void CheckDailyReport()
 
 //+------------------------------------------------------------------+
 //| KONTROLA DRAWDOWN ALERTU                                         |
-//| Upozorní keď drawdown prekročí nastavenú úroveň                  |
 //+------------------------------------------------------------------+
 void CheckDrawdownAlert()
 {
@@ -442,29 +503,22 @@ void CheckDrawdownAlert()
    if(currentDD > maxDrawdownToday)
       maxDrawdownToday = currentDD;
 
-   //--- Alert ak drawdown prekročí varovnú úroveň
-   static datetime lastDDAlert = 0;
-   if(currentDD >= InpAlertDrawdown && TimeCurrent() - lastDDAlert > 3600) // Max 1 alert za hodinu
+   //--- Alert ak drawdown prekročí varovnú úroveň (max 1x za hodinu)
+   if(currentDD >= InpAlertDrawdown && TimeCurrent() - lastDDAlert > 3600)
    {
       lastDDAlert = TimeCurrent();
 
-      string ddMsg = StringFormat(
-         "⚠️ DRAWDOWN ALERT!\n" +
-         "━━━━━━━━━━━━━━━\n" +
-         "Aktuálny DD: %.2f%%\n" +
-         "Max povolený: %.2f%%\n" +
-         "Zostatok: $%.2f\n" +
-         "Equity: $%.2f\n" +
-         "Strata: $%.2f\n" +
-         "━━━━━━━━━━━━━━━",
-         currentDD,
-         InpMaxDrawdownPct,
-         balance,
-         equity,
-         balance - equity
-      );
+      string ddMsg =
+         ":warning: **DRAWDOWN ALERT!**\n" +
+         "```\n" +
+         "Aktuálny:  " + DoubleToString(currentDD, 2) + "%\n" +
+         "Maximum:   " + DoubleToString(InpMaxDrawdownPct, 1) + "%\n" +
+         "Zostatok:  $" + DoubleToString(balance, 2) + "\n" +
+         "Equity:    $" + DoubleToString(equity, 2) + "\n" +
+         "Strata:    $" + DoubleToString(balance - equity, 2) + "\n" +
+         "```";
 
-      SendNotification_All(ddMsg);
+      SendNotification_All("DRAWDOWN ALERT", ddMsg);
    }
 }
 
@@ -479,21 +533,17 @@ void NotifyTradeOpen(string type, int level, double lots, double price)
    dailyTrades++;
    totalTradesSession++;
 
-   string tradeMsg = StringFormat(
-      "📈 NOVÝ OBCHOD\n" +
-      "Typ: %s\n" +
-      "Úroveň: %d\n" +
-      "Loty: %.2f\n" +
-      "Cena: %.5f\n" +
-      "Celkom pozícií: %d",
-      type,
-      level,
-      lots,
-      price,
-      GetPositionCount()
-   );
+   string tradeMsg =
+      ":chart_with_upwards_trend: **NOVÝ OBCHOD**\n" +
+      "```\n" +
+      "Typ:       " + type + "\n" +
+      "Úroveň:    " + IntegerToString(level) + "\n" +
+      "Loty:      " + DoubleToString(lots, 2) + "\n" +
+      "Cena:      " + DoubleToString(price, 5) + "\n" +
+      "Pozícií:   " + IntegerToString(GetPositionCount()) + "\n" +
+      "```";
 
-   SendNotification_All(tradeMsg);
+   SendNotification_All("OBCHOD " + type, tradeMsg);
 }
 
 //+------------------------------------------------------------------+
@@ -501,29 +551,23 @@ void NotifyTradeOpen(string type, int level, double lots, double price)
 //+------------------------------------------------------------------+
 void NotifyTradeClose(string reason, double profit, int count)
 {
-   if(!InpNotifyProfit && !InpNotifyTrade)
+   if(!InpNotifyProfit)
       return;
 
    dailyProfit += profit;
 
-   string emoji = (profit >= 0) ? "💰" : "📉";
-   string closeMsg = StringFormat(
-      "%s POZÍCIE ZATVORENÉ\n" +
-      "━━━━━━━━━━━━━━━\n" +
-      "Dôvod: %s\n" +
-      "Pozícií: %d\n" +
-      "Profit: %s$%.2f\n" +
-      "Nový zostatok: $%.2f\n" +
-      "━━━━━━━━━━━━━━━",
-      emoji,
-      reason,
-      count,
-      (profit >= 0 ? "+" : ""),
-      profit,
-      AccountInfoDouble(ACCOUNT_BALANCE)
-   );
+   string emoji = (profit >= 0) ? ":moneybag:" : ":small_red_triangle_down:";
 
-   SendNotification_All(closeMsg);
+   string closeMsg =
+      emoji + " **POZÍCIE ZATVORENÉ**\n" +
+      "```\n" +
+      "Dôvod:     " + reason + "\n" +
+      "Pozícií:   " + IntegerToString(count) + "\n" +
+      "Profit:    " + (profit >= 0 ? "+" : "") + DoubleToString(profit, 2) + "$\n" +
+      "Zostatok:  $" + DoubleToString(AccountInfoDouble(ACCOUNT_BALANCE), 2) + "\n" +
+      "```";
+
+   SendNotification_All("PROFIT " + DoubleToString(profit, 2) + "$", closeMsg);
 }
 
 //+------------------------------------------------------------------+
@@ -534,21 +578,21 @@ string GetDeinitReasonText(int reason)
    switch(reason)
    {
       case REASON_PROGRAM:     return "EA zastavený";
-      case REASON_REMOVE:      return "EA odstránený z grafu";
-      case REASON_RECOMPILE:   return "EA prekompilovaný";
-      case REASON_CHARTCHANGE: return "Zmena symbolu/timeframe";
+      case REASON_REMOVE:      return "EA odstránený";
+      case REASON_RECOMPILE:   return "Prekompilovaný";
+      case REASON_CHARTCHANGE: return "Zmena grafu";
       case REASON_CHARTCLOSE:  return "Graf zatvorený";
       case REASON_PARAMETERS:  return "Zmena parametrov";
       case REASON_ACCOUNT:     return "Zmena účtu";
-      case REASON_TEMPLATE:    return "Aplikovaná šablóna";
-      case REASON_INITFAILED:  return "Zlyhanie inicializácie";
-      case REASON_CLOSE:       return "Terminál zatvorený";
-      default:                 return "Neznámy dôvod";
+      case REASON_TEMPLATE:    return "Šablóna";
+      case REASON_INITFAILED:  return "Init failed";
+      case REASON_CLOSE:       return "MT5 zatvorený";
+      default:                 return "Neznámy";
    }
 }
 
 //+------------------------------------------------------------------+
-//| ZVYŠOK KÓDU - OBCHODNÁ LOGIKA (ROVNAKÁ AKO V1)                   |
+//| OBCHODNÁ LOGIKA                                                  |
 //+------------------------------------------------------------------+
 
 bool IsTradingTime()
@@ -569,7 +613,7 @@ bool CheckDrawdown()
    double drawdown = (balance - equity) / balance * 100;
    if(drawdown >= InpMaxDrawdownPct)
    {
-      Print("VAROVANIE: Maximálny drawdown dosiahnutý: ", drawdown, "%");
+      Print("MAX DRAWDOWN: ", drawdown, "%");
       return true;
    }
    return false;
@@ -623,7 +667,7 @@ bool OpenGridPosition(ENUM_ORDER_TYPE orderType, int level)
    double totalLots = GetTotalLots() + lotSize;
    if(totalLots > InpMaxLotSize)
    {
-      Print("VAROVANIE: Max loty dosiahnuté: ", totalLots);
+      Print("MAX LOTY: ", totalLots);
       return false;
    }
 
@@ -638,7 +682,7 @@ bool OpenGridPosition(ENUM_ORDER_TYPE orderType, int level)
    else tp = price - tpPips;
 
    bool result = false;
-   string comment = "NoPain Grid L" + IntegerToString(level);
+   string comment = "NoPain L" + IntegerToString(level);
    if(orderType == ORDER_TYPE_BUY)
       result = trade.Buy(lotSize, symbol, price, 0, tp, comment);
    else
@@ -647,12 +691,12 @@ bool OpenGridPosition(ENUM_ORDER_TYPE orderType, int level)
    if(result)
    {
       string typeStr = (orderType == ORDER_TYPE_BUY) ? "BUY" : "SELL";
-      Print("OTVORENÁ: ", typeStr, " L", level, " Lots:", lotSize, " @", price);
+      Print("OPEN: ", typeStr, " L", level, " @", price, " Lots:", lotSize);
       NotifyTradeOpen(typeStr, level, lotSize, price);
    }
    else
    {
-      Print("CHYBA: ", trade.ResultRetcode(), " - ", trade.ResultRetcodeDescription());
+      Print("ERROR: ", trade.ResultRetcode(), " - ", trade.ResultRetcodeDescription());
    }
    return result;
 }
@@ -714,7 +758,7 @@ bool CheckTotalProfit()
    double targetProfit = balance * InpTotalTPPercent / 100.0;
    if(totalProfit >= targetProfit)
    {
-      Print("CIEĽOVÝ PROFIT: ", totalProfit, " >= ", targetProfit);
+      Print("TARGET PROFIT: ", totalProfit);
       return true;
    }
    return false;
@@ -751,7 +795,7 @@ void CloseAllPositions(string reason)
       if(trade.PositionClose(ticket)) closedCount++;
    }
 
-   Print("ZATVORENÉ ", closedCount, " pozícií | Dôvod: ", reason, " | Profit: ", closedProfit);
+   Print("CLOSED ", closedCount, " | Reason: ", reason, " | Profit: ", closedProfit);
    NotifyTradeClose(reason, closedProfit, closedCount);
 }
 
