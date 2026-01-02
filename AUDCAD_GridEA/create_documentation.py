@@ -138,11 +138,11 @@ def create_mega_diagram(c, width, height):
     # Title
     c.setFillColor(DARK_BLUE)
     c.setFont("Helvetica-Bold", 24)
-    c.drawCentredString(width/2, height - 1.5*cm, "CLAUDE_LIKE_NOPAIN EA v4.00 - KOMPLETNY VYVOJOVY DIAGRAM")
+    c.drawCentredString(width/2, height - 1.5*cm, "CLAUDE_LIKE_NOPAIN EA v4.30 - KOMPLETNY VYVOJOVY DIAGRAM")
 
     c.setFont("Helvetica", 11)
     c.setFillColor(GRAY)
-    c.drawCentredString(width/2, height - 2.1*cm, "Vsetky funkcie a ich prepojenia | AUDCAD Grid Trading System")
+    c.drawCentredString(width/2, height - 2.1*cm, "MTF Analysis | Trailing Stop | Spread Filter | Breakeven | AUDCAD Grid Trading")
 
     # =========================================================================
     # SECTION 1: LIFECYCLE (top left)
@@ -282,63 +282,71 @@ def create_mega_diagram(c, width, height):
     draw_box(c, flow_x - 3.6*cm, flow_y - 2*cm, 2.8*cm, 0.8*cm, "OpenGridPosition()\nLevel 0", GREEN, white, font_size=7)
 
     # =========================================================================
-    # SECTION 3: SIGNAL LOGIC (left)
+    # SECTION 3: SIGNAL LOGIC (left) - with MTF
     # =========================================================================
     sec3_x = 1*cm
     sec3_y = height - 18*cm
     sec3_w = 8*cm
     sec3_h = 7.5*cm
 
-    draw_section_box(c, sec3_x, sec3_y, sec3_w, sec3_h, "SIGNALOVA LOGIKA", ORANGE)
+    draw_section_box(c, sec3_x, sec3_y, sec3_w, sec3_h, "SIGNALOVA LOGIKA + MTF", ORANGE)
 
-    sig_y = sec3_y + sec3_h - 1.5*cm
+    sig_y = sec3_y + sec3_h - 1.3*cm
 
     # GetSignal detail
-    draw_box(c, sec3_x + 0.5*cm, sig_y, 3*cm, 0.8*cm, "GetSignal()", ORANGE, white, font_size=9)
+    draw_box(c, sec3_x + 0.4*cm, sig_y, 2.5*cm, 0.65*cm, "GetSignal()", ORANGE, white, font_size=8)
+
+    # MTF Analysis box - right side
+    draw_box(c, sec3_x + 4.5*cm, sig_y + 0.3*cm, 3.2*cm, 1.8*cm, "MTF ANALYZA\nD1 + H4 + H1\nTrend filter", PURPLE, white, font_size=6)
+    c.setFont("Helvetica", 5)
+    c.setFillColor(GRAY)
+    c.drawString(sec3_x + 4.6*cm, sig_y - 0.1*cm, "RSI>55=UP, <45=DOWN")
 
     # RSI check
-    sig_y -= 1.2*cm
-    draw_arrow(c, sec3_x + 2*cm, sig_y + 1.2*cm, sec3_x + 2*cm, sig_y + 0.8*cm, "", ORANGE)
-    draw_box(c, sec3_x + 0.5*cm, sig_y, 3.5*cm, 0.7*cm, "CopyBuffer(RSI)", LIGHT_ORANGE, font_size=7)
+    sig_y -= 1.1*cm
+    draw_arrow(c, sec3_x + 1.65*cm, sig_y + 1.1*cm, sec3_x + 1.65*cm, sig_y + 0.65*cm, "", ORANGE)
+    draw_box(c, sec3_x + 0.4*cm, sig_y, 2.5*cm, 0.55*cm, "CopyBuffer(RSI)", LIGHT_ORANGE, font_size=6)
 
     # BUY condition
-    sig_y -= 1*cm
-    draw_arrow(c, sec3_x + 2*cm, sig_y + 1*cm, sec3_x + 2*cm, sig_y + 0.7*cm, "", GRAY)
-    draw_diamond(c, sec3_x + 0.3*cm, sig_y - 0.3*cm, 3.5*cm, 1*cm, "RSI < 35?", LIGHT_GREEN, GREEN)
+    sig_y -= 0.9*cm
+    draw_arrow(c, sec3_x + 1.65*cm, sig_y + 0.9*cm, sec3_x + 1.65*cm, sig_y + 0.65*cm, "", GRAY)
+    draw_diamond(c, sec3_x + 0.2*cm, sig_y - 0.25*cm, 2.9*cm, 0.9*cm, "RSI<35?", LIGHT_GREEN, GREEN)
 
-    c.setFont("Helvetica-Bold", 7)
+    c.setFont("Helvetica-Bold", 6)
     c.setFillColor(GREEN)
-    c.drawString(sec3_x + 4*cm, sig_y + 0.3*cm, "ANO")
-    draw_arrow(c, sec3_x + 3.8*cm, sig_y + 0.2*cm, sec3_x + 4.5*cm, sig_y + 0.2*cm, "", GREEN)
-    draw_box(c, sec3_x + 4.5*cm, sig_y, 2.5*cm, 0.6*cm, "return 1\nBUY", GREEN, white, font_size=7)
+    c.drawString(sec3_x + 3.3*cm, sig_y + 0.2*cm, "ANO")
+    draw_arrow(c, sec3_x + 3.1*cm, sig_y + 0.15*cm, sec3_x + 3.7*cm, sig_y + 0.15*cm, "", GREEN)
+    draw_box(c, sec3_x + 3.7*cm, sig_y - 0.05*cm, 2*cm, 0.5*cm, "BUY", GREEN, white, font_size=6)
 
     # SELL condition
-    sig_y -= 1.3*cm
+    sig_y -= 1.1*cm
     c.setFillColor(GRAY)
-    c.drawString(sec3_x + 1.8*cm, sig_y + 1*cm, "NIE")
-    draw_arrow(c, sec3_x + 2*cm, sig_y + 0.8*cm, sec3_x + 2*cm, sig_y + 0.7*cm, "", GRAY)
-    draw_diamond(c, sec3_x + 0.3*cm, sig_y - 0.3*cm, 3.5*cm, 1*cm, "RSI > 65?", LIGHT_RED, RED)
+    c.setFont("Helvetica-Bold", 6)
+    c.drawString(sec3_x + 1.4*cm, sig_y + 0.85*cm, "NIE")
+    draw_arrow(c, sec3_x + 1.65*cm, sig_y + 0.7*cm, sec3_x + 1.65*cm, sig_y + 0.6*cm, "", GRAY)
+    draw_diamond(c, sec3_x + 0.2*cm, sig_y - 0.25*cm, 2.9*cm, 0.9*cm, "RSI>65?", LIGHT_RED, RED)
 
-    c.setFont("Helvetica-Bold", 7)
+    c.setFont("Helvetica-Bold", 6)
     c.setFillColor(RED)
-    c.drawString(sec3_x + 4*cm, sig_y + 0.3*cm, "ANO")
-    draw_arrow(c, sec3_x + 3.8*cm, sig_y + 0.2*cm, sec3_x + 4.5*cm, sig_y + 0.2*cm, "", RED)
-    draw_box(c, sec3_x + 4.5*cm, sig_y, 2.5*cm, 0.6*cm, "return -1\nSELL", RED, white, font_size=7)
+    c.drawString(sec3_x + 3.3*cm, sig_y + 0.2*cm, "ANO")
+    draw_arrow(c, sec3_x + 3.1*cm, sig_y + 0.15*cm, sec3_x + 3.7*cm, sig_y + 0.15*cm, "", RED)
+    draw_box(c, sec3_x + 3.7*cm, sig_y - 0.05*cm, 2*cm, 0.5*cm, "SELL", RED, white, font_size=6)
 
     # No signal
-    sig_y -= 1.2*cm
+    sig_y -= 1*cm
     c.setFillColor(GRAY)
-    c.drawString(sec3_x + 1.8*cm, sig_y + 0.9*cm, "NIE")
-    draw_arrow(c, sec3_x + 2*cm, sig_y + 0.7*cm, sec3_x + 2*cm, sig_y + 0.5*cm, "", GRAY)
-    draw_box(c, sec3_x + 0.8*cm, sig_y - 0.2*cm, 2.5*cm, 0.6*cm, "return 0", GRAY, white, font_size=7)
+    c.setFont("Helvetica-Bold", 6)
+    c.drawString(sec3_x + 1.4*cm, sig_y + 0.75*cm, "NIE")
+    draw_arrow(c, sec3_x + 1.65*cm, sig_y + 0.6*cm, sec3_x + 1.65*cm, sig_y + 0.45*cm, "", GRAY)
+    draw_box(c, sec3_x + 0.6*cm, sig_y - 0.15*cm, 2.1*cm, 0.5*cm, "return 0", GRAY, white, font_size=6)
 
     # =========================================================================
-    # SECTION 4: GRID MANAGEMENT (right)
+    # SECTION 4: GRID MANAGEMENT (right) - moved up
     # =========================================================================
     sec4_x = 21*cm
-    sec4_y = height - 13*cm
+    sec4_y = height - 10.5*cm
     sec4_w = 8*cm
-    sec4_h = 10*cm
+    sec4_h = 7.5*cm
 
     draw_section_box(c, sec4_x, sec4_y, sec4_w, sec4_h, "GRID MANAGEMENT", BLUE)
 
@@ -488,53 +496,90 @@ def create_mega_diagram(c, width, height):
         trig_y += 0.55*cm
 
     # =========================================================================
-    # SECTION 7: POSITION CLOSING (bottom right)
+    # SECTION 7: POSITION CLOSING (bottom right) - repositioned
     # =========================================================================
     sec7_x = 22*cm
     sec7_y = 1*cm
     sec7_w = 7*cm
-    sec7_h = 6*cm
+    sec7_h = 5*cm
 
     draw_section_box(c, sec7_x, sec7_y, sec7_w, sec7_h, "ZATVARANIE POZICII", RED)
 
     # CloseAllPositions
-    close_y = sec7_y + sec7_h - 1.5*cm
-    draw_box(c, sec7_x + 0.5*cm, close_y, 3.5*cm, 0.8*cm, "CloseAllPositions(reason)", RED, white, font_size=7)
+    close_y = sec7_y + sec7_h - 1.3*cm
+    draw_box(c, sec7_x + 0.5*cm, close_y, 3.5*cm, 0.7*cm, "CloseAllPositions()", RED, white, font_size=7)
 
-    # Steps
-    steps = [
-        "1. Loop cez PositionsTotal()",
-        "2. Filter Magic number",
-        "3. Sucet profit + swap",
-        "4. trade.PositionClose()",
-        "5. NotifyTradeClose()",
-    ]
-
-    close_y -= 0.3*cm
-    for step in steps:
-        close_y -= 0.5*cm
-        c.setFont("Helvetica", 7)
-        c.setFillColor(black)
-        c.drawString(sec7_x + 0.7*cm, close_y, step)
-
-    # Reasons
-    close_y -= 0.8*cm
-    c.setFont("Helvetica-Bold", 7)
+    # Reasons - compact
+    close_y -= 0.5*cm
+    c.setFont("Helvetica-Bold", 6)
     c.setFillColor(DARK_RED)
     c.drawString(sec7_x + 0.5*cm, close_y, "Dovody zatvorenia:")
 
     reasons = [
-        ("Target Profit", GREEN, "0.8% balance"),
-        ("Max Drawdown", RED, "15% DD"),
+        ("Target Profit", GREEN, "0.8%"),
+        ("Max DD %", RED, "15%"),
+        ("Equity $", ORANGE, "$ limit"),
+        ("Breakeven", CYAN, "SL hit"),
     ]
 
     close_y -= 0.1*cm
     for name, color, desc in reasons:
-        close_y -= 0.5*cm
-        draw_box(c, sec7_x + 0.5*cm, close_y, 2*cm, 0.45*cm, name, color, white, font_size=6)
-        c.setFont("Helvetica", 6)
+        close_y -= 0.45*cm
+        draw_box(c, sec7_x + 0.5*cm, close_y, 1.8*cm, 0.4*cm, name, color, white, font_size=5)
+        c.setFont("Helvetica", 5)
         c.setFillColor(GRAY)
-        c.drawString(sec7_x + 2.7*cm, close_y + 0.12*cm, desc)
+        c.drawString(sec7_x + 2.5*cm, close_y + 0.1*cm, desc)
+
+    # =========================================================================
+    # SECTION 8: NEW PROTECTIONS (v4.30) - above closing
+    # =========================================================================
+    sec8_x = 21*cm
+    sec8_y = 6.5*cm
+    sec8_w = 8*cm
+    sec8_h = 6*cm
+
+    draw_section_box(c, sec8_x, sec8_y, sec8_w, sec8_h, "OCHRANA v4.30", CYAN)
+
+    prot_y = sec8_y + sec8_h - 1.5*cm
+
+    # Spread Filter
+    draw_box(c, sec8_x + 0.4*cm, prot_y, 2.3*cm, 0.7*cm, "CheckSpread()", CYAN, white, font_size=7)
+    c.setFont("Helvetica", 5)
+    c.setFillColor(GRAY)
+    c.drawString(sec8_x + 2.9*cm, prot_y + 0.35*cm, "Max 3 pips")
+    c.drawString(sec8_x + 2.9*cm, prot_y + 0.1*cm, "Blokuje obchod")
+
+    # Equity Protection
+    prot_y -= 1*cm
+    draw_box(c, sec8_x + 0.4*cm, prot_y, 2.3*cm, 0.7*cm, "CheckEquity()", ORANGE, white, font_size=7)
+    c.setFont("Helvetica", 5)
+    c.setFillColor(GRAY)
+    c.drawString(sec8_x + 2.9*cm, prot_y + 0.35*cm, "Max $ strata")
+    c.drawString(sec8_x + 2.9*cm, prot_y + 0.1*cm, "Absolutna ochrana")
+
+    # Breakeven
+    prot_y -= 1*cm
+    draw_box(c, sec8_x + 0.4*cm, prot_y, 2.5*cm, 0.7*cm, "ManageBreakeven()", GREEN, white, font_size=7)
+    c.setFont("Helvetica", 5)
+    c.setFillColor(GRAY)
+    c.drawString(sec8_x + 3.1*cm, prot_y + 0.35*cm, "+10 pips profit")
+    c.drawString(sec8_x + 3.1*cm, prot_y + 0.1*cm, "SL -> Entry+2")
+
+    # Trailing Stop
+    prot_y -= 1*cm
+    draw_box(c, sec8_x + 0.4*cm, prot_y, 2.3*cm, 0.7*cm, "TrailingStop()", PURPLE, white, font_size=7)
+    c.setFont("Helvetica", 5)
+    c.setFillColor(GRAY)
+    c.drawString(sec8_x + 2.9*cm, prot_y + 0.35*cm, "50 pips trail")
+    c.drawString(sec8_x + 2.9*cm, prot_y + 0.1*cm, "Step 10 pips")
+
+    # Dynamic TP
+    prot_y -= 1*cm
+    draw_box(c, sec8_x + 0.4*cm, prot_y, 2.3*cm, 0.7*cm, "Dynamic TP", DARK_GREEN, white, font_size=7)
+    c.setFont("Helvetica", 5)
+    c.setFillColor(GRAY)
+    c.drawString(sec8_x + 2.9*cm, prot_y + 0.35*cm, "ATR(14) based")
+    c.drawString(sec8_x + 2.9*cm, prot_y + 0.1*cm, "Min 10, Max 50")
 
     # =========================================================================
     # CONNECTING ARROWS BETWEEN SECTIONS
@@ -600,19 +645,19 @@ def create_page_2_detail(c, width, height):
 
     # Title
     c.setFillColor(DARK_BLUE)
-    c.setFont("Helvetica-Bold", 20)
-    c.drawCentredString(width/2, height - 1.5*cm, "DETAILNY POPIS PARAMETROV A LOGIKY")
+    c.setFont("Helvetica-Bold", 18)
+    c.drawCentredString(width/2, height - 1.3*cm, "DETAILNY POPIS PARAMETROV A LOGIKY v4.30")
 
-    y = height - 3*cm
+    y = height - 2.5*cm
 
     # Two columns
-    col1_x = 1.5*cm
-    col2_x = width/2 + 0.5*cm
+    col1_x = 1.2*cm
+    col2_x = width/2 + 0.3*cm
     col_w = width/2 - 2*cm
 
     # Column 1: Parameters
     c.setFillColor(DARK_BLUE)
-    c.setFont("Helvetica-Bold", 12)
+    c.setFont("Helvetica-Bold", 10)
     c.drawString(col1_x, y, "VSTUPNE PARAMETRE")
 
     params = [
@@ -625,59 +670,96 @@ def create_page_2_detail(c, width, height):
             ("InpTotalTPPercent = 0.8", "Cielovy profit %"),
         ]),
         ("RISK", RED, [
-            ("InpMaxDrawdownPct = 15", "Max DD pre zatvorenie"),
+            ("InpMaxDrawdownPct = 15", "Max DD % pre zatvorenie"),
+            ("InpMaxLossAmount = 0", "Max strata v $ (0=off)"),
             ("InpMagicNumber = 2262642", "ID nasich obchodov"),
         ]),
-        ("SIGNAL", ORANGE, [
-            ("InpRSIPeriod = 14", "RSI perioda"),
-            ("InpRSIOverbought = 65", "SELL zona"),
-            ("InpRSIOversold = 35", "BUY zona"),
-            ("InpTimeframe = H1", "Casovy ram"),
+        ("SPREAD FILTER", CYAN, [
+            ("InpMaxSpreadPips = 3.0", "Max spread (0=off)"),
         ]),
-        ("CAS", CYAN, [
+        ("BREAKEVEN", DARK_GREEN, [
+            ("InpUseBreakeven = true", "Aktivovat breakeven"),
+            ("InpBreakevenStart = 10", "+X pips pre aktivaciu"),
+            ("InpBreakevenOffset = 2", "Offset od entry"),
+        ]),
+        ("TRAILING STOP", PURPLE, [
+            ("InpUseTrailing = true", "Pouzit trailing"),
+            ("InpTrailingPips = 50", "Trail vzdialenost"),
+            ("InpTrailingStep = 10", "Min krok posunu"),
+        ]),
+        ("DYNAMIC TP", ORANGE, [
+            ("InpUseDynamicTP = true", "ATR-based TP"),
+            ("InpMinTPPips = 10", "Min TP"),
+            ("InpMaxTPPips = 50", "Max TP"),
+        ]),
+    ]
+
+    y -= 0.6*cm
+    for group, color, items in params:
+        c.setFillColor(color)
+        c.setFont("Helvetica-Bold", 8)
+        c.drawString(col1_x, y, group)
+        y -= 0.32*cm
+
+        for param, desc in items:
+            c.setFont("Courier", 6)
+            c.setFillColor(DARK_GRAY)
+            c.drawString(col1_x + 0.15*cm, y, param)
+            c.setFont("Helvetica", 6)
+            c.setFillColor(GRAY)
+            c.drawString(col1_x + 4.5*cm, y, desc)
+            y -= 0.3*cm
+        y -= 0.2*cm
+
+    # Continue with MTF and TIME in column 1
+    more_params = [
+        ("MTF ANALYZA", PURPLE, [
+            ("InpUseMTF = true", "Multi-timeframe filter"),
+            ("D1/H4/H1 RSI", "Trend confirmation"),
+        ]),
+        ("CAS", GRAY, [
             ("InpStartHour = 0", "Od hodiny"),
             ("InpEndHour = 23", "Do hodiny"),
             ("InpTradeFriday = true", "Piatok povoleny"),
         ]),
     ]
 
-    y -= 0.8*cm
-    for group, color, items in params:
+    for group, color, items in more_params:
         c.setFillColor(color)
-        c.setFont("Helvetica-Bold", 9)
+        c.setFont("Helvetica-Bold", 8)
         c.drawString(col1_x, y, group)
-        y -= 0.4*cm
+        y -= 0.32*cm
 
         for param, desc in items:
-            c.setFont("Courier", 7)
+            c.setFont("Courier", 6)
             c.setFillColor(DARK_GRAY)
-            c.drawString(col1_x + 0.2*cm, y, param)
-            c.setFont("Helvetica", 7)
+            c.drawString(col1_x + 0.15*cm, y, param)
+            c.setFont("Helvetica", 6)
             c.setFillColor(GRAY)
-            c.drawString(col1_x + 5*cm, y, desc)
-            y -= 0.35*cm
-        y -= 0.3*cm
+            c.drawString(col1_x + 4.5*cm, y, desc)
+            y -= 0.3*cm
+        y -= 0.2*cm
 
     # Column 2: How it works
-    y2 = height - 3*cm
+    y2 = height - 2.5*cm
     c.setFillColor(DARK_BLUE)
-    c.setFont("Helvetica-Bold", 12)
+    c.setFont("Helvetica-Bold", 10)
     c.drawString(col2_x, y2, "AKO TO FUNGUJE")
 
-    y2 -= 0.8*cm
+    y2 -= 0.6*cm
 
     how_it_works = [
-        ("1. SIGNAL", ORANGE, [
+        ("1. SIGNAL + MTF", ORANGE, [
             "RSI(14) na H1 timeframe",
             "RSI < 35 = BUY (prepredane)",
             "RSI > 65 = SELL (prekupene)",
-            "Signal len ked nemame pozicie",
+            "MTF: D1+H4+H1 trend filter",
         ]),
         ("2. GRID OTVORENIE", GREEN, [
             "Prvy obchod = Level 0",
             "Lot vypocitany podla balance",
-            "TP = +20 pips na kazdu poziciu",
-            "SL = ziadny (grid recovery)",
+            "Dynamic TP podla ATR",
+            "Spread check pred otvorenim",
         ]),
         ("3. GRID ROZSIRENIE", BLUE, [
             "Cena ide proti nam o 25 pips",
@@ -685,26 +767,32 @@ def create_page_2_detail(c, width, height):
             "Lot = predosly × 1.3",
             "Max 7 urovni (ochrana)",
         ]),
-        ("4. ZATVORENIE", PURPLE, [
+        ("4. OCHRANA POZICII", CYAN, [
+            "Breakeven: +10 pips -> SL=entry+2",
+            "Trailing: 50 pips, step 10",
+            "Max $ strata (equity ochrana)",
+            "Max spread blokuje obchody",
+        ]),
+        ("5. ZATVORENIE", PURPLE, [
             "Celkovy profit >= 0.8% balance",
             "ALEBO drawdown >= 15%",
+            "ALEBO equity $ limit",
             "Zatvori VSETKY pozicie naraz",
-            "Caka na novy RSI signal",
         ]),
     ]
 
     for title, color, lines in how_it_works:
         c.setFillColor(color)
-        c.setFont("Helvetica-Bold", 9)
+        c.setFont("Helvetica-Bold", 8)
         c.drawString(col2_x, y2, title)
-        y2 -= 0.4*cm
+        y2 -= 0.35*cm
 
-        c.setFont("Helvetica", 8)
+        c.setFont("Helvetica", 7)
         c.setFillColor(black)
         for line in lines:
-            c.drawString(col2_x + 0.3*cm, y2, "• " + line)
-            y2 -= 0.35*cm
-        y2 -= 0.3*cm
+            c.drawString(col2_x + 0.2*cm, y2, "• " + line)
+            y2 -= 0.3*cm
+        y2 -= 0.2*cm
 
     # Bottom section: Grid example
     y = min(y, y2) - 1*cm
@@ -784,7 +872,7 @@ def create_page_2_detail(c, width, height):
     # Footer
     c.setFillColor(GRAY)
     c.setFont("Helvetica", 8)
-    c.drawString(1.5*cm, 1*cm, "Claude_Like_NoPain EA v4.00 | Auto-Optimized Grid Trading | AUDCAD")
+    c.drawString(1.5*cm, 1*cm, "Claude_Like_NoPain EA v4.30 | MTF + Trailing + Breakeven + Spread Filter | AUDCAD")
     c.drawRightString(width - 1.5*cm, 1*cm, "github.com/PeterPecho7/NoPainGrid-EA")
 
 def create_pdf():

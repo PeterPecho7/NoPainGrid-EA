@@ -1,5 +1,5 @@
-# Compiled EA files
-*.ex5
+# Compiled EA files (keep .ex5 in repo for distribution)
+# *.ex5
 *.ex4
 
 # MetaTrader backup files
