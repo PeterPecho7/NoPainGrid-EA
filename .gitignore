@@ -1,0 +1,37 @@
+# Compiled EA files
+*.ex5
+*.ex4
+
+# MetaTrader backup files
+*.bak
+
+# Log files
+*.log
+
+# MetaTrader cache
+*.hst
+*.hcc
+
+# Excel lock files
+~$*.xlsx
+~$*.xls
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# IDE files
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Temporary files
+*.tmp
+*.temp
