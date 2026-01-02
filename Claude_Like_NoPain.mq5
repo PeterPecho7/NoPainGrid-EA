@@ -62,7 +62,7 @@ input ENUM_TIMEFRAMES InpTimeframe = PERIOD_H1;   // Časový rámec
 //--- DISCORD MONITORING
 input group "=== DISCORD WEBHOOK ==="
 input bool     InpUseDiscord     = true;          // Používať Discord notifikácie
-input string   InpDiscordWebhook = "";            // Discord Webhook URL (celá URL)
+input string   InpDiscordWebhook = ""; // Discord Webhook URL (celá URL)
 
 //--- MT5 PUSH NOTIFIKÁCIE
 input group "=== MT5 PUSH NOTIFIKÁCIE ==="
@@ -70,7 +70,7 @@ input bool     InpUsePush        = true;          // Používať MT5 Push notifi
 
 //--- EMAIL NOTIFIKÁCIE
 input group "=== EMAIL NOTIFIKÁCIE ==="
-input bool     InpUseEmail       = true;          // Používať Email notifikácie (nastav SMTP v Options)
+input bool     InpUseEmail       = false;         // Používať Email notifikácie (nastav SMTP v Options)
 
 //--- TYPY NOTIFIKÁCIÍ
 input group "=== ČO NOTIFIKOVAŤ ==="
@@ -86,6 +86,12 @@ input group "=== PRAHY UPOZORNENÍ ==="
 input double   InpAlertDrawdown  = 10.0;          // Upozorniť pri drawdowne % (varovanie pred max)
 input int      InpHeartbeatHour  = 1;             // Heartbeat každých X hodín (1-24)
 
+//--- VIZUALIZÁCIA
+input group "=== VIZUALIZÁCIA ==="
+input bool     InpShowPanel      = true;          // Zobraziť info panel na grafe
+input color    InpPanelColor     = clrDarkSlateGray; // Farba pozadia panelu
+input color    InpTextColor      = clrWhite;      // Farba textu
+
 //+------------------------------------------------------------------+
 //| GLOBÁLNE PREMENNÉ                                                 |
 //+------------------------------------------------------------------+
@@ -93,7 +99,7 @@ CTrade         trade;
 int            handleRSI;
 double         gridStep;
 double         point;
-string         symbol = "AUDCAD";
+string         g_symbol = "AUDCAD";
 double         initialBalance;
 
 //--- Grid tracking
@@ -127,9 +133,9 @@ double         maxDrawdownToday = 0;
 int OnInit()
 {
    //--- Overenie symbolu
-   if(!SymbolSelect(symbol, true))
+   if(!SymbolSelect(g_symbol, true))
    {
-      Print("CHYBA: Symbol ", symbol, " nie je dostupný!");
+      Print("CHYBA: Symbol ", g_symbol, " nie je dostupný!");
       return(INIT_FAILED);
    }
 
@@ -139,15 +145,15 @@ int OnInit()
    trade.SetTypeFilling(ORDER_FILLING_IOC);
 
    //--- Výpočet hodnôt
-   point = SymbolInfoDouble(symbol, SYMBOL_POINT);
-   int digits = (int)SymbolInfoInteger(symbol, SYMBOL_DIGITS);
+   point = SymbolInfoDouble(g_symbol, SYMBOL_POINT);
+   int digits = (int)SymbolInfoInteger(g_symbol, SYMBOL_DIGITS);
    if(digits == 3 || digits == 5)
       gridStep = InpGridStepPips * 10 * point;
    else
       gridStep = InpGridStepPips * point;
 
    //--- RSI indikátor
-   handleRSI = iRSI(symbol, InpTimeframe, InpRSIPeriod, PRICE_CLOSE);
+   handleRSI = iRSI(g_symbol, InpTimeframe, InpRSIPeriod, PRICE_CLOSE);
    if(handleRSI == INVALID_HANDLE)
    {
       Print("CHYBA: Nepodarilo sa vytvoriť RSI indikátor!");
@@ -166,16 +172,12 @@ int OnInit()
       double autoLot = CalculateLotSize(0);
       string lotMode = InpAutoLot ? "AUTO" : "MANUAL";
       string startMsg =
-         ":green_circle: **EA SPUSTENÝ**\n" +
-         "```\n" +
-         "Symbol:    " + symbol + "\n" +
-         "Zostatok:  $" + DoubleToString(initialBalance, 2) + "\n" +
-         "Lot mode:  " + lotMode + "\n" +
-         "Base lot:  " + DoubleToString(autoLot, 2) + "\n" +
-         "Grid:      " + IntegerToString(InpGridStepPips) + " pips x " + IntegerToString(InpMaxGridLevels) + " levels\n" +
-         "Risk:      " + DoubleToString(InpRiskPercent, 1) + "% per grid\n" +
-         "Max DD:    " + DoubleToString(InpMaxDrawdownPct, 1) + "%\n" +
-         "```";
+         "[OK] EA SPUSTENY - " + g_symbol + " | " +
+         "Zostatok: $" + DoubleToString(initialBalance, 2) + " | " +
+         "Lot: " + lotMode + " " + DoubleToString(autoLot, 2) + " | " +
+         "Grid: " + IntegerToString(InpGridStepPips) + "pips x " + IntegerToString(InpMaxGridLevels) + " | " +
+         "Risk: " + DoubleToString(InpRiskPercent, 1) + "% | " +
+         "Max DD: " + DoubleToString(InpMaxDrawdownPct, 1) + "%";
       SendNotification_All("EA SPUSTENÝ", startMsg);
    }
 
@@ -188,6 +190,9 @@ int OnInit()
 //+------------------------------------------------------------------+
 void OnDeinit(const int reason)
 {
+   //--- Odstráň panel
+   DeleteInfoPanel();
+
    if(handleRSI != INVALID_HANDLE)
       IndicatorRelease(handleRSI);
 
@@ -196,13 +201,11 @@ void OnDeinit(const int reason)
    {
       double sessionPL = AccountInfoDouble(ACCOUNT_BALANCE) - initialBalance;
       string stopMsg =
-         ":red_circle: **EA ZASTAVENÝ**\n" +
-         "```\n" +
-         "Dôvod:     " + GetDeinitReasonText(reason) + "\n" +
-         "Zostatok:  $" + DoubleToString(AccountInfoDouble(ACCOUNT_BALANCE), 2) + "\n" +
-         "Session:   " + (sessionPL >= 0 ? "+" : "") + DoubleToString(sessionPL, 2) + "$\n" +
-         "Obchodov:  " + IntegerToString(totalTradesSession) + "\n" +
-         "```";
+         "[STOP] EA ZASTAVENY | " +
+         "Dovod: " + GetDeinitReasonText(reason) + " | " +
+         "Zostatok: $" + DoubleToString(AccountInfoDouble(ACCOUNT_BALANCE), 2) + " | " +
+         "Session: " + (sessionPL >= 0 ? "+" : "") + DoubleToString(sessionPL, 2) + "$ | " +
+         "Obchodov: " + IntegerToString(totalTradesSession);
       SendNotification_All("EA ZASTAVENÝ", stopMsg);
    }
 }
@@ -212,6 +215,10 @@ void OnDeinit(const int reason)
 //+------------------------------------------------------------------+
 void OnTick()
 {
+   //--- Vizualizácia
+   DrawInfoPanel();
+   DrawGridLevels();
+
    //--- Monitoring kontroly
    CheckHeartbeat();
    CheckDailyReport();
@@ -416,14 +423,12 @@ void CheckHeartbeat()
       int openPositions = GetPositionCount();
 
       string heartbeatMsg =
-         ":heartbeat: **HEARTBEAT** " + TimeToString(currentTime, TIME_DATE|TIME_MINUTES) + "\n" +
-         "```\n" +
-         "Zostatok:  $" + DoubleToString(balance, 2) + "\n" +
-         "Equity:    $" + DoubleToString(equity, 2) + "\n" +
-         "Floating:  " + (floatingPL >= 0 ? "+" : "") + DoubleToString(floatingPL, 2) + "$\n" +
-         "Drawdown:  " + DoubleToString(currentDD, 2) + "%\n" +
-         "Pozície:   " + IntegerToString(openPositions) + "\n" +
-         "```";
+         "[HEARTBEAT] " + TimeToString(currentTime, TIME_DATE|TIME_MINUTES) + " | " +
+         "Bal: $" + DoubleToString(balance, 2) + " | " +
+         "Eq: $" + DoubleToString(equity, 2) + " | " +
+         "Float: " + (floatingPL >= 0 ? "+" : "") + DoubleToString(floatingPL, 2) + "$ | " +
+         "DD: " + DoubleToString(currentDD, 2) + "% | " +
+         "Pos: " + IntegerToString(openPositions);
 
       //--- Heartbeat len cez Discord (menej spam na mobil)
       SendDiscord(heartbeatMsg);
@@ -452,20 +457,15 @@ void CheckDailyReport()
       double dayPL = currentBalance - dailyStartBalance;
       double dayPLPercent = (dailyStartBalance > 0) ? (dayPL / dailyStartBalance * 100) : 0;
 
-      string emoji = (dayPL >= 0) ? ":chart_with_upwards_trend:" : ":chart_with_downwards_trend:";
-
       string reportMsg =
-         ":bar_chart: **DENNÝ REPORT**\n" +
-         "```\n" +
-         "Dátum:     " + IntegerToString(dt.year) + "-" +
-                         StringFormat("%02d", dt.mon) + "-" +
-                         StringFormat("%02d", dt.day) + "\n" +
-         "Zostatok:  $" + DoubleToString(currentBalance, 2) + "\n" +
-         "Denný P/L: " + (dayPL >= 0 ? "+" : "") + DoubleToString(dayPL, 2) +
-                    "$ (" + DoubleToString(dayPLPercent, 2) + "%)\n" +
-         "Obchodov:  " + IntegerToString(dailyTrades) + "\n" +
-         "Max DD:    " + DoubleToString(maxDrawdownToday, 2) + "%\n" +
-         "```";
+         "[DAILY] " + IntegerToString(dt.year) + "-" +
+                      StringFormat("%02d", dt.mon) + "-" +
+                      StringFormat("%02d", dt.day) + " | " +
+         "Bal: $" + DoubleToString(currentBalance, 2) + " | " +
+         "P/L: " + (dayPL >= 0 ? "+" : "") + DoubleToString(dayPL, 2) +
+                   "$ (" + DoubleToString(dayPLPercent, 2) + "%) | " +
+         "Trades: " + IntegerToString(dailyTrades) + " | " +
+         "Max DD: " + DoubleToString(maxDrawdownToday, 2) + "%";
 
       SendNotification_All("DENNÝ REPORT", reportMsg);
 
@@ -503,14 +503,11 @@ void CheckDrawdownAlert()
       lastDDAlert = TimeCurrent();
 
       string ddMsg =
-         ":warning: **DRAWDOWN ALERT!**\n" +
-         "```\n" +
-         "Aktuálny:  " + DoubleToString(currentDD, 2) + "%\n" +
-         "Maximum:   " + DoubleToString(InpMaxDrawdownPct, 1) + "%\n" +
-         "Zostatok:  $" + DoubleToString(balance, 2) + "\n" +
-         "Equity:    $" + DoubleToString(equity, 2) + "\n" +
-         "Strata:    $" + DoubleToString(balance - equity, 2) + "\n" +
-         "```";
+         "[WARNING] DRAWDOWN " + DoubleToString(currentDD, 2) + "% | " +
+         "Max: " + DoubleToString(InpMaxDrawdownPct, 1) + "% | " +
+         "Bal: $" + DoubleToString(balance, 2) + " | " +
+         "Eq: $" + DoubleToString(equity, 2) + " | " +
+         "Loss: $" + DoubleToString(balance - equity, 2);
 
       SendNotification_All("DRAWDOWN ALERT", ddMsg);
    }
@@ -528,14 +525,10 @@ void NotifyTradeOpen(string type, int level, double lots, double price)
    totalTradesSession++;
 
    string tradeMsg =
-      ":chart_with_upwards_trend: **NOVÝ OBCHOD**\n" +
-      "```\n" +
-      "Typ:       " + type + "\n" +
-      "Úroveň:    " + IntegerToString(level) + "\n" +
-      "Loty:      " + DoubleToString(lots, 2) + "\n" +
-      "Cena:      " + DoubleToString(price, 5) + "\n" +
-      "Pozícií:   " + IntegerToString(GetPositionCount()) + "\n" +
-      "```";
+      "[TRADE] " + type + " L" + IntegerToString(level) + " | " +
+      "Lots: " + DoubleToString(lots, 2) + " | " +
+      "Price: " + DoubleToString(price, 5) + " | " +
+      "Positions: " + IntegerToString(GetPositionCount());
 
    SendNotification_All("OBCHOD " + type, tradeMsg);
 }
@@ -550,16 +543,11 @@ void NotifyTradeClose(string reason, double profit, int count)
 
    dailyProfit += profit;
 
-   string emoji = (profit >= 0) ? ":moneybag:" : ":small_red_triangle_down:";
-
    string closeMsg =
-      emoji + " **POZÍCIE ZATVORENÉ**\n" +
-      "```\n" +
-      "Dôvod:     " + reason + "\n" +
-      "Pozícií:   " + IntegerToString(count) + "\n" +
-      "Profit:    " + (profit >= 0 ? "+" : "") + DoubleToString(profit, 2) + "$\n" +
-      "Zostatok:  $" + DoubleToString(AccountInfoDouble(ACCOUNT_BALANCE), 2) + "\n" +
-      "```";
+      "[CLOSE] " + reason + " | " +
+      "Positions: " + IntegerToString(count) + " | " +
+      "Profit: " + (profit >= 0 ? "+" : "") + DoubleToString(profit, 2) + "$ | " +
+      "Balance: $" + DoubleToString(AccountInfoDouble(ACCOUNT_BALANCE), 2);
 
    SendNotification_All("PROFIT " + DoubleToString(profit, 2) + "$", closeMsg);
 }
@@ -634,7 +622,7 @@ void UpdateGridInfo()
       ulong ticket = PositionGetTicket(i);
       if(ticket <= 0) continue;
       if(PositionGetInteger(POSITION_MAGIC) != InpMagicNumber) continue;
-      if(PositionGetString(POSITION_SYMBOL) != symbol) continue;
+      if(PositionGetString(POSITION_SYMBOL) != g_symbol) continue;
       ENUM_POSITION_TYPE posType = (ENUM_POSITION_TYPE)PositionGetInteger(POSITION_TYPE);
       double openPrice = PositionGetDouble(POSITION_PRICE_OPEN);
       double lots = PositionGetDouble(POSITION_VOLUME);
@@ -668,12 +656,12 @@ bool OpenGridPosition(ENUM_ORDER_TYPE orderType, int level)
       return false;
    }
 
-   double ask = SymbolInfoDouble(symbol, SYMBOL_ASK);
-   double bid = SymbolInfoDouble(symbol, SYMBOL_BID);
+   double ask = SymbolInfoDouble(g_symbol, SYMBOL_ASK);
+   double bid = SymbolInfoDouble(g_symbol, SYMBOL_BID);
    double price = (orderType == ORDER_TYPE_BUY) ? ask : bid;
 
    double tp = 0;
-   int digits = (int)SymbolInfoInteger(symbol, SYMBOL_DIGITS);
+   int digits = (int)SymbolInfoInteger(g_symbol, SYMBOL_DIGITS);
    double tpPips = InpTakeProfitPips * ((digits == 3 || digits == 5) ? 10 : 1) * point;
    if(orderType == ORDER_TYPE_BUY) tp = price + tpPips;
    else tp = price - tpPips;
@@ -681,9 +669,9 @@ bool OpenGridPosition(ENUM_ORDER_TYPE orderType, int level)
    bool result = false;
    string comment = "NoPain L" + IntegerToString(level);
    if(orderType == ORDER_TYPE_BUY)
-      result = trade.Buy(lotSize, symbol, price, 0, tp, comment);
+      result = trade.Buy(lotSize, g_symbol, price, 0, tp, comment);
    else
-      result = trade.Sell(lotSize, symbol, price, 0, tp, comment);
+      result = trade.Sell(lotSize, g_symbol, price, 0, tp, comment);
 
    if(result)
    {
@@ -708,7 +696,7 @@ double CalculateLotSize(int level)
       //--- Pre AUDCAD s pákou 1:500, grid 7 úrovní
       //--- Vzorec: (balance * risk%) / (maxGridDrawdownPips * pipValue * lotMultiplierSum)
       double balance = AccountInfoDouble(ACCOUNT_BALANCE);
-      double pipValue = SymbolInfoDouble(symbol, SYMBOL_TRADE_TICK_VALUE);
+      double pipValue = SymbolInfoDouble(g_symbol, SYMBOL_TRADE_TICK_VALUE);
 
       //--- Suma násobičov pre všetky úrovne (1 + 1.3 + 1.69 + ...)
       double multiplierSum = 0;
@@ -738,9 +726,9 @@ double CalculateLotSize(int level)
    for(int i = 0; i < level; i++) lots *= InpLotMultiplier;
 
    //--- Normalizuj na povolené hodnoty
-   double minLot = SymbolInfoDouble(symbol, SYMBOL_VOLUME_MIN);
-   double maxLot = SymbolInfoDouble(symbol, SYMBOL_VOLUME_MAX);
-   double lotStep = SymbolInfoDouble(symbol, SYMBOL_VOLUME_STEP);
+   double minLot = SymbolInfoDouble(g_symbol, SYMBOL_VOLUME_MIN);
+   double maxLot = SymbolInfoDouble(g_symbol, SYMBOL_VOLUME_MAX);
+   double lotStep = SymbolInfoDouble(g_symbol, SYMBOL_VOLUME_STEP);
    lots = MathFloor(lots / lotStep) * lotStep;
    lots = MathMax(minLot, MathMin(maxLot, lots));
 
@@ -755,7 +743,7 @@ double GetTotalLots()
       ulong ticket = PositionGetTicket(i);
       if(ticket <= 0) continue;
       if(PositionGetInteger(POSITION_MAGIC) != InpMagicNumber) continue;
-      if(PositionGetString(POSITION_SYMBOL) != symbol) continue;
+      if(PositionGetString(POSITION_SYMBOL) != g_symbol) continue;
       totalLots += PositionGetDouble(POSITION_VOLUME);
    }
    return totalLots;
@@ -763,8 +751,8 @@ double GetTotalLots()
 
 void ManageGrid()
 {
-   double ask = SymbolInfoDouble(symbol, SYMBOL_ASK);
-   double bid = SymbolInfoDouble(symbol, SYMBOL_BID);
+   double ask = SymbolInfoDouble(g_symbol, SYMBOL_ASK);
+   double bid = SymbolInfoDouble(g_symbol, SYMBOL_BID);
 
    if(buyLevels > 0 && buyLevels < InpMaxGridLevels)
    {
@@ -806,7 +794,7 @@ double GetTotalProfit()
       ulong ticket = PositionGetTicket(i);
       if(ticket <= 0) continue;
       if(PositionGetInteger(POSITION_MAGIC) != InpMagicNumber) continue;
-      if(PositionGetString(POSITION_SYMBOL) != symbol) continue;
+      if(PositionGetString(POSITION_SYMBOL) != g_symbol) continue;
       totalProfit += PositionGetDouble(POSITION_PROFIT);
       totalProfit += PositionGetDouble(POSITION_SWAP);
    }
@@ -823,7 +811,7 @@ void CloseAllPositions(string reason)
       ulong ticket = PositionGetTicket(i);
       if(ticket <= 0) continue;
       if(PositionGetInteger(POSITION_MAGIC) != InpMagicNumber) continue;
-      if(PositionGetString(POSITION_SYMBOL) != symbol) continue;
+      if(PositionGetString(POSITION_SYMBOL) != g_symbol) continue;
       closedProfit += PositionGetDouble(POSITION_PROFIT);
       closedProfit += PositionGetDouble(POSITION_SWAP);
       if(trade.PositionClose(ticket)) closedCount++;
@@ -841,10 +829,414 @@ int GetPositionCount()
       ulong ticket = PositionGetTicket(i);
       if(ticket <= 0) continue;
       if(PositionGetInteger(POSITION_MAGIC) != InpMagicNumber) continue;
-      if(PositionGetString(POSITION_SYMBOL) != symbol) continue;
+      if(PositionGetString(POSITION_SYMBOL) != g_symbol) continue;
       count++;
    }
    return count;
+}
+
+//+------------------------------------------------------------------+
+//| VIZUALIZÁCIA - INFO PANEL NA GRAFE                               |
+//+------------------------------------------------------------------+
+void DrawInfoPanel()
+{
+   if(!InpShowPanel)
+      return;
+
+   string prefix = "NoPain_";
+   int x = 10;
+   int y = 30;
+   int lineHeight = 18;
+   int line = 0;
+
+   //--- Získaj aktuálne hodnoty
+   double balance = AccountInfoDouble(ACCOUNT_BALANCE);
+   double equity = AccountInfoDouble(ACCOUNT_EQUITY);
+   double floatingPL = equity - balance;
+   double drawdown = (balance > 0) ? ((balance - equity) / balance * 100) : 0;
+   double totalProfit = GetTotalProfit();
+   double sessionPL = balance - initialBalance;
+
+   //--- RSI hodnota
+   double rsi[];
+   ArraySetAsSeries(rsi, true);
+   double rsiValue = 0;
+   if(CopyBuffer(handleRSI, 0, 0, 1, rsi) > 0)
+      rsiValue = rsi[0];
+
+   //--- Stav signálu
+   string signalText = "CAKAM";
+   color signalColor = clrGray;
+   if(rsiValue < InpRSIOversold)
+   {
+      signalText = "BUY SIGNAL";
+      signalColor = clrLime;
+   }
+   else if(rsiValue > InpRSIOverbought)
+   {
+      signalText = "SELL SIGNAL";
+      signalColor = clrRed;
+   }
+
+   //--- Stav gridu
+   string gridStatus = "";
+   color gridColor = clrWhite;
+   if(buyLevels > 0)
+   {
+      gridStatus = "BUY GRID L" + IntegerToString(buyLevels);
+      gridColor = clrDodgerBlue;
+   }
+   else if(sellLevels > 0)
+   {
+      gridStatus = "SELL GRID L" + IntegerToString(sellLevels);
+      gridColor = clrOrangeRed;
+   }
+   else
+   {
+      gridStatus = "ZIADEN GRID";
+      gridColor = clrGray;
+   }
+
+   //--- Farba drawdownu
+   color ddColor = clrLime;
+   if(drawdown > 5) ddColor = clrYellow;
+   if(drawdown > 10) ddColor = clrOrange;
+   if(drawdown > InpAlertDrawdown) ddColor = clrRed;
+
+   //--- Vytvor pozadie panelu
+   string bgName = prefix + "BG";
+   if(ObjectFind(0, bgName) < 0)
+      ObjectCreate(0, bgName, OBJ_RECTANGLE_LABEL, 0, 0, 0);
+   ObjectSetInteger(0, bgName, OBJPROP_XDISTANCE, x - 5);
+   ObjectSetInteger(0, bgName, OBJPROP_YDISTANCE, y - 5);
+   ObjectSetInteger(0, bgName, OBJPROP_XSIZE, 220);
+   ObjectSetInteger(0, bgName, OBJPROP_YSIZE, lineHeight * 14 + 10);
+   ObjectSetInteger(0, bgName, OBJPROP_BGCOLOR, InpPanelColor);
+   ObjectSetInteger(0, bgName, OBJPROP_BORDER_TYPE, BORDER_FLAT);
+   ObjectSetInteger(0, bgName, OBJPROP_CORNER, CORNER_LEFT_UPPER);
+   ObjectSetInteger(0, bgName, OBJPROP_BACK, false);
+
+   //--- Nadpis
+   CreateLabel(prefix + "Title", x, y + line * lineHeight, "=== CLAUDE LIKE NOPAIN ===", clrGold, 9, true);
+   line++;
+
+   //--- Separator
+   CreateLabel(prefix + "Sep1", x, y + line * lineHeight, "------------------------", clrGray, 8, false);
+   line++;
+
+   //--- Account info
+   CreateLabel(prefix + "Balance", x, y + line * lineHeight, "Zostatok:  $" + DoubleToString(balance, 2), InpTextColor, 8, false);
+   line++;
+   CreateLabel(prefix + "Equity", x, y + line * lineHeight, "Equity:    $" + DoubleToString(equity, 2), InpTextColor, 8, false);
+   line++;
+   CreateLabel(prefix + "Floating", x, y + line * lineHeight, "Floating:  " + (floatingPL >= 0 ? "+" : "") + DoubleToString(floatingPL, 2) + "$", floatingPL >= 0 ? clrLime : clrRed, 8, false);
+   line++;
+   CreateLabel(prefix + "Drawdown", x, y + line * lineHeight, "Drawdown:  " + DoubleToString(drawdown, 2) + "%", ddColor, 8, false);
+   line++;
+
+   //--- Separator
+   CreateLabel(prefix + "Sep2", x, y + line * lineHeight, "------------------------", clrGray, 8, false);
+   line++;
+
+   //--- Grid info
+   CreateLabel(prefix + "GridStatus", x, y + line * lineHeight, "Grid:      " + gridStatus, gridColor, 8, false);
+   line++;
+   CreateLabel(prefix + "Positions", x, y + line * lineHeight, "Pozicie:   " + IntegerToString(buyLevels + sellLevels) + "/" + IntegerToString(InpMaxGridLevels), InpTextColor, 8, false);
+   line++;
+   CreateLabel(prefix + "BaseLot", x, y + line * lineHeight, "Base Lot:  " + DoubleToString(CalculateLotSize(0), 2), InpTextColor, 8, false);
+   line++;
+
+   //--- Separator
+   CreateLabel(prefix + "Sep3", x, y + line * lineHeight, "------------------------", clrGray, 8, false);
+   line++;
+
+   //--- Signal info
+   CreateLabel(prefix + "RSI", x, y + line * lineHeight, "RSI(" + IntegerToString(InpRSIPeriod) + "): " + DoubleToString(rsiValue, 1), InpTextColor, 8, false);
+   line++;
+   CreateLabel(prefix + "Signal", x, y + line * lineHeight, "Signal:    " + signalText, signalColor, 8, true);
+   line++;
+
+   //--- Session P/L
+   CreateLabel(prefix + "Session", x, y + line * lineHeight, "Session:   " + (sessionPL >= 0 ? "+" : "") + DoubleToString(sessionPL, 2) + "$", sessionPL >= 0 ? clrLime : clrRed, 8, false);
+
+   ChartRedraw();
+}
+
+//+------------------------------------------------------------------+
+//| POMOCNÁ FUNKCIA - VYTVORENIE LABELU                              |
+//+------------------------------------------------------------------+
+void CreateLabel(string name, int x, int y, string text, color clr, int fontSize, bool bold)
+{
+   if(ObjectFind(0, name) < 0)
+      ObjectCreate(0, name, OBJ_LABEL, 0, 0, 0);
+
+   ObjectSetInteger(0, name, OBJPROP_XDISTANCE, x);
+   ObjectSetInteger(0, name, OBJPROP_YDISTANCE, y);
+   ObjectSetString(0, name, OBJPROP_TEXT, text);
+   ObjectSetInteger(0, name, OBJPROP_COLOR, clr);
+   ObjectSetInteger(0, name, OBJPROP_FONTSIZE, fontSize);
+   ObjectSetString(0, name, OBJPROP_FONT, bold ? "Arial Bold" : "Arial");
+   ObjectSetInteger(0, name, OBJPROP_CORNER, CORNER_LEFT_UPPER);
+}
+
+//+------------------------------------------------------------------+
+//| ODSTRÁNENIE PANELU                                               |
+//+------------------------------------------------------------------+
+void DeleteInfoPanel()
+{
+   string prefix = "NoPain_";
+   ObjectsDeleteAll(0, prefix);
+}
+
+//+------------------------------------------------------------------+
+//| KRESLENIE GRID ÚROVNÍ NA GRAF                                    |
+//+------------------------------------------------------------------+
+void DrawGridLevels()
+{
+   if(!InpShowPanel)
+      return;
+
+   string prefix = "NoPain_Grid_";
+
+   //--- Sleduj zmeny stavu aby sa zbytočne neprekresloval
+   static int lastBuyLevels = -1;
+   static int lastSellLevels = -1;
+   static datetime lastUpdate = 0;
+
+   //--- Aktualizuj len každú sekundu alebo pri zmene gridu
+   datetime now = TimeCurrent();
+   bool forceUpdate = (buyLevels != lastBuyLevels || sellLevels != lastSellLevels);
+
+   if(!forceUpdate && now - lastUpdate < 1)
+      return;
+
+   lastUpdate = now;
+
+   //--- Ak sa zmenil stav gridu, odstráň staré objekty
+   if(forceUpdate)
+   {
+      ObjectsDeleteAll(0, prefix);
+      lastBuyLevels = buyLevels;
+      lastSellLevels = sellLevels;
+   }
+
+   //--- Ak nie sú žiadne pozície, nakresli potenciálne entry úrovne
+   if(buyLevels == 0 && sellLevels == 0)
+   {
+      double currentPrice = SymbolInfoDouble(g_symbol, SYMBOL_BID);
+
+      //--- Nakresli potenciálne BUY úrovne (dole)
+      for(int i = 0; i < InpMaxGridLevels; i++)
+      {
+         double levelPrice = currentPrice - (i * gridStep);
+         string lineName = prefix + "PotBuy_" + IntegerToString(i);
+         CreateHLine(lineName, levelPrice, clrDodgerBlue, STYLE_DOT, 1);
+
+         //--- Label pre úroveň
+         string labelName = prefix + "LblBuy_" + IntegerToString(i);
+         double lotAtLevel = CalculateLotSize(i);
+         string desc = "BUY L" + IntegerToString(i) + " | " + DoubleToString(lotAtLevel, 2) + " lot";
+         if(i == 0) desc += " (ENTRY)";
+         CreatePriceLabel(labelName, levelPrice, desc, clrDodgerBlue);
+      }
+
+      //--- Nakresli potenciálne SELL úrovne (hore)
+      for(int i = 0; i < InpMaxGridLevels; i++)
+      {
+         double levelPrice = currentPrice + (i * gridStep);
+         string lineName = prefix + "PotSell_" + IntegerToString(i);
+         CreateHLine(lineName, levelPrice, clrOrangeRed, STYLE_DOT, 1);
+
+         string labelName = prefix + "LblSell_" + IntegerToString(i);
+         double lotAtLevel = CalculateLotSize(i);
+         string desc = "SELL L" + IntegerToString(i) + " | " + DoubleToString(lotAtLevel, 2) + " lot";
+         if(i == 0) desc += " (ENTRY)";
+         CreatePriceLabel(labelName, levelPrice, desc, clrOrangeRed, false);
+      }
+      return;
+   }
+
+   //--- Ak máme BUY grid
+   if(buyLevels > 0)
+   {
+      //--- Nakresli otvorené pozície
+      for(int i = 0; i < buyLevels; i++)
+      {
+         string lineName = prefix + "Buy_" + IntegerToString(i);
+         CreateHLine(lineName, buyGrid[i].openPrice, clrDodgerBlue, STYLE_SOLID, 2);
+
+         string labelName = prefix + "LblBuyOpen_" + IntegerToString(i);
+         string lotText = "OPEN BUY L" + IntegerToString(i) + " | " + DoubleToString(buyGrid[i].lots, 2) + " lot @ " + DoubleToString(buyGrid[i].openPrice, 5);
+         CreatePriceLabel(labelName, buyGrid[i].openPrice, lotText, clrDodgerBlue);
+      }
+
+      //--- Nakresli nasledujúcu grid úroveň (kde sa otvorí ďalšia pozícia)
+      if(buyLevels < InpMaxGridLevels)
+      {
+         double lowestBuy = DBL_MAX;
+         for(int i = 0; i < buyLevels; i++)
+            if(buyGrid[i].openPrice < lowestBuy) lowestBuy = buyGrid[i].openPrice;
+
+         double nextLevel = lowestBuy - gridStep;
+         string lineName = prefix + "NextBuy";
+         CreateHLine(lineName, nextLevel, clrAqua, STYLE_DASH, 1);
+
+         string labelName = prefix + "LblNextBuy";
+         double nextLot = CalculateLotSize(buyLevels);
+         CreatePriceLabel(labelName, nextLevel, ">>> NEXT BUY L" + IntegerToString(buyLevels) + " | " + DoubleToString(nextLot, 2) + " lot (caka na cenu)", clrAqua);
+      }
+
+      //--- Nakresli TP úroveň (priemerná cena + TP)
+      double avgPrice = 0;
+      double totalLots = 0;
+      for(int i = 0; i < buyLevels; i++)
+      {
+         avgPrice += buyGrid[i].openPrice * buyGrid[i].lots;
+         totalLots += buyGrid[i].lots;
+      }
+      if(totalLots > 0)
+      {
+         avgPrice /= totalLots;
+         int digits = (int)SymbolInfoInteger(g_symbol, SYMBOL_DIGITS);
+         double tpPips = InpTakeProfitPips * ((digits == 3 || digits == 5) ? 10 : 1) * point;
+         double tpPrice = avgPrice + tpPips;
+         double currentBid = SymbolInfoDouble(g_symbol, SYMBOL_BID);
+         double pipsToTP = (tpPrice - currentBid) / (point * ((digits == 3 || digits == 5) ? 10 : 1));
+
+         string lineNameAvg = prefix + "AvgBuy";
+         CreateHLine(lineNameAvg, avgPrice, clrYellow, STYLE_DASHDOT, 1);
+         CreatePriceLabel(prefix + "LblAvgBuy", avgPrice, "PRIEMER (breakeven) | Total: " + DoubleToString(totalLots, 2) + " lot", clrYellow);
+
+         string lineNameTP = prefix + "TPBuy";
+         CreateHLine(lineNameTP, tpPrice, clrLime, STYLE_SOLID, 2);
+         CreatePriceLabel(prefix + "LblTPBuy", tpPrice, "*** TAKE PROFIT *** | " + DoubleToString(pipsToTP, 1) + " pips to go", clrLime);
+      }
+   }
+
+   //--- Ak máme SELL grid
+   if(sellLevels > 0)
+   {
+      //--- Nakresli otvorené pozície
+      for(int i = 0; i < sellLevels; i++)
+      {
+         string lineName = prefix + "Sell_" + IntegerToString(i);
+         CreateHLine(lineName, sellGrid[i].openPrice, clrOrangeRed, STYLE_SOLID, 2);
+
+         string labelName = prefix + "LblSellOpen_" + IntegerToString(i);
+         string lotText = "OPEN SELL L" + IntegerToString(i) + " | " + DoubleToString(sellGrid[i].lots, 2) + " lot @ " + DoubleToString(sellGrid[i].openPrice, 5);
+         CreatePriceLabel(labelName, sellGrid[i].openPrice, lotText, clrOrangeRed, false);
+      }
+
+      //--- Nakresli nasledujúcu grid úroveň
+      if(sellLevels < InpMaxGridLevels)
+      {
+         double highestSell = 0;
+         for(int i = 0; i < sellLevels; i++)
+            if(sellGrid[i].openPrice > highestSell) highestSell = sellGrid[i].openPrice;
+
+         double nextLevel = highestSell + gridStep;
+         string lineName = prefix + "NextSell";
+         CreateHLine(lineName, nextLevel, clrPink, STYLE_DASH, 1);
+
+         string labelName = prefix + "LblNextSell";
+         double nextLot = CalculateLotSize(sellLevels);
+         CreatePriceLabel(labelName, nextLevel, ">>> NEXT SELL L" + IntegerToString(sellLevels) + " | " + DoubleToString(nextLot, 2) + " lot (caka na cenu)", clrPink, false);
+      }
+
+      //--- Nakresli TP úroveň
+      double avgPrice = 0;
+      double totalLots = 0;
+      for(int i = 0; i < sellLevels; i++)
+      {
+         avgPrice += sellGrid[i].openPrice * sellGrid[i].lots;
+         totalLots += sellGrid[i].lots;
+      }
+      if(totalLots > 0)
+      {
+         avgPrice /= totalLots;
+         int digits = (int)SymbolInfoInteger(g_symbol, SYMBOL_DIGITS);
+         double tpPips = InpTakeProfitPips * ((digits == 3 || digits == 5) ? 10 : 1) * point;
+         double tpPrice = avgPrice - tpPips;
+         double currentAsk = SymbolInfoDouble(g_symbol, SYMBOL_ASK);
+         double pipsToTP = (currentAsk - tpPrice) / (point * ((digits == 3 || digits == 5) ? 10 : 1));
+
+         string lineNameAvg = prefix + "AvgSell";
+         CreateHLine(lineNameAvg, avgPrice, clrYellow, STYLE_DASHDOT, 1);
+         CreatePriceLabel(prefix + "LblAvgSell", avgPrice, "PRIEMER (breakeven) | Total: " + DoubleToString(totalLots, 2) + " lot", clrYellow, false);
+
+         string lineNameTP = prefix + "TPSell";
+         CreateHLine(lineNameTP, tpPrice, clrLime, STYLE_SOLID, 2);
+         CreatePriceLabel(prefix + "LblTPSell", tpPrice, "*** TAKE PROFIT *** | " + DoubleToString(pipsToTP, 1) + " pips to go", clrLime, false);
+      }
+   }
+
+   ChartRedraw();
+}
+
+//+------------------------------------------------------------------+
+//| VYTVORENIE HORIZONTÁLNEJ ČIARY                                   |
+//+------------------------------------------------------------------+
+void CreateHLine(string name, double price, color clr, ENUM_LINE_STYLE style, int width)
+{
+   if(ObjectFind(0, name) < 0)
+      ObjectCreate(0, name, OBJ_HLINE, 0, 0, price);
+
+   ObjectSetDouble(0, name, OBJPROP_PRICE, price);
+   ObjectSetInteger(0, name, OBJPROP_COLOR, clr);
+   ObjectSetInteger(0, name, OBJPROP_STYLE, style);
+   ObjectSetInteger(0, name, OBJPROP_WIDTH, width);
+   ObjectSetInteger(0, name, OBJPROP_BACK, true);
+   ObjectSetInteger(0, name, OBJPROP_SELECTABLE, false);
+}
+
+//+------------------------------------------------------------------+
+//| VYTVORENIE PRICE LABELU NA PRAVEJ STRANE GRAFU                   |
+//| isBuy = true: label NAD čiarou, false: label POD čiarou          |
+//+------------------------------------------------------------------+
+void CreatePriceLabel(string name, double price, string text, color clr, bool isBuy = true)
+{
+   if(ObjectFind(0, name) < 0)
+      ObjectCreate(0, name, OBJ_LABEL, 0, 0, 0);
+
+   int yPos = PriceToY(price);
+
+   //--- BUY labely nad čiarou (-12px), SELL labely pod čiarou (+2px)
+   if(isBuy)
+      yPos -= 12;  // Nad čiarou
+   else
+      yPos += 2;   // Pod čiarou
+
+   //--- Ak je Y mimo obrazovky, uprav
+   if(yPos < 0) yPos = 2;
+   int chartHeight = (int)ChartGetInteger(0, CHART_HEIGHT_IN_PIXELS);
+   if(yPos > chartHeight - 10) yPos = chartHeight - 10;
+
+   //--- X pozícia za info panelom
+   int xPos = 240;
+
+   ObjectSetInteger(0, name, OBJPROP_CORNER, CORNER_LEFT_UPPER);
+   ObjectSetInteger(0, name, OBJPROP_XDISTANCE, xPos);
+   ObjectSetInteger(0, name, OBJPROP_YDISTANCE, yPos);
+   ObjectSetString(0, name, OBJPROP_TEXT, text);
+   ObjectSetInteger(0, name, OBJPROP_COLOR, clr);
+   ObjectSetInteger(0, name, OBJPROP_FONTSIZE, 8);
+   ObjectSetString(0, name, OBJPROP_FONT, "Arial Bold");
+   ObjectSetInteger(0, name, OBJPROP_BACK, false);
+}
+
+//+------------------------------------------------------------------+
+//| KONVERZIA CENY NA Y SÚRADNICU                                    |
+//+------------------------------------------------------------------+
+int PriceToY(double price)
+{
+   double priceMax = ChartGetDouble(0, CHART_PRICE_MAX);
+   double priceMin = ChartGetDouble(0, CHART_PRICE_MIN);
+   int chartHeight = (int)ChartGetInteger(0, CHART_HEIGHT_IN_PIXELS);
+
+   if(priceMax == priceMin) return chartHeight / 2;
+
+   double ratio = (priceMax - price) / (priceMax - priceMin);
+   return (int)(ratio * chartHeight);
 }
 
 //+------------------------------------------------------------------+
