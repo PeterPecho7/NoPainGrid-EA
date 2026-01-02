@@ -1,38 +1,24 @@
 //+------------------------------------------------------------------+
-//|                                    NoPainGrid_EA_v3_Monitoring.mq5|
+//|                                            Claude_Like_NoPain.mq5|
 //|                                                                   |
-//|  VERZIA S MONITORINGOM                                           |
+//|  AUTO-OPTIMIZED GRID EA                                          |
 //|  ======================                                           |
-//|  Táto verzia obsahuje:                                           |
-//|  - Discord notifikácie (webhook)                                 |
-//|  - MT5 Push notifikácie na mobil                                 |
-//|  - Email notifikácie                                             |
-//|  - Denný report                                                  |
-//|  - Heartbeat monitoring (kontrola že EA beží)                    |
+//|  - Automaticky vypočíta lot podľa zostatku účtu                  |
+//|  - Optimalizované pre AUDCAD                                     |
+//|  - Discord/Push/Email monitoring                                 |
 //|                                                                   |
-//|  NASTAVENIE DISCORD:                                             |
+//|  STAČÍ SPUSTIŤ - všetko sa nastaví automaticky!                  |
+//|                                                                   |
+//|  VOLITEĽNÉ NASTAVENIE DISCORD:                                   |
 //|  1. Vytvor Discord server alebo použi existujúci                 |
 //|  2. Vytvor kanál pre notifikácie (napr. #trading-alerts)         |
 //|  3. Klikni na ozubené koliesko pri kanáli -> Integrations        |
 //|  4. Klikni "Create Webhook" a skopíruj URL                       |
 //|  5. Zadaj URL do nastavení EA                                    |
-//|                                                                   |
-//|  NASTAVENIE MT5 PUSH:                                            |
-//|  1. Stiahni MetaTrader 5 app na mobil                            |
-//|  2. V app choď do Settings -> Messages                           |
-//|  3. Nájdi MetaQuotes ID (8 znakov)                               |
-//|  4. V MT5 PC: Tools -> Options -> Notifications                  |
-//|  5. Zadaj MetaQuotes ID a zapni notifikácie                      |
-//|                                                                   |
-//|  NASTAVENIE EMAIL:                                               |
-//|  1. V MT5: Tools -> Options -> Email                             |
-//|  2. Zadaj SMTP server (napr. smtp.gmail.com:465)                 |
-//|  3. Zadaj email a heslo (pre Gmail použi App Password)           |
-//|  4. Otestuj tlačidlom Test                                       |
 //+------------------------------------------------------------------+
-#property copyright "Based on NoPain MT5 Signal + Monitoring"
-#property version   "3.00"
-#property description "Grid/Martingale EA s Discord/Email/Push monitoringom"
+#property copyright "Claude Like NoPain - Auto Optimized"
+#property version   "4.00"
+#property description "Auto-optimized Grid EA pre AUDCAD"
 #property strict
 
 #include <Trade\Trade.mqh>
@@ -41,32 +27,36 @@
 //| VSTUPNÉ PARAMETRE                                                 |
 //+------------------------------------------------------------------+
 
-//--- Hlavné nastavenia gridu
-input group "=== HLAVNÉ NASTAVENIA GRIDU ==="
-input double   InpLotSize        = 0.13;          // Počiatočná veľkosť lotu
-input double   InpLotMultiplier  = 1.5;           // Násobič lotu pre ďalšie úrovne
-input int      InpGridStepPips   = 20;            // Rozostup mriežky v pipsoch
-input int      InpMaxGridLevels  = 10;            // Maximálny počet úrovní gridu
-input double   InpTakeProfitPips = 15;            // Take Profit v pipsoch
-input double   InpTotalTPPercent = 1.0;           // Celkový TP ako % zostatku
+//--- AUTO-OPTIMIZED NASTAVENIA (netreba meniť!)
+input group "=== AUTO NASTAVENIA (netreba meniť) ==="
+input bool     InpAutoLot        = true;          // AUTO LOT podľa zostatku (odporúčané)
+input double   InpRiskPercent    = 2.0;           // Risk % na grid sériu (ak AutoLot=true)
+input double   InpManualLot      = 0.01;          // Manuálny lot (ak AutoLot=false)
 
-//--- Časové filtre
+//--- OPTIMALIZOVANÉ HODNOTY PRE AUDCAD
+input group "=== OPTIMALIZOVANÉ PRE AUDCAD ==="
+input double   InpLotMultiplier  = 1.3;           // Násobič lotu (1.3 = konzervatívny)
+input int      InpGridStepPips   = 25;            // Grid step v pipsoch (25 = bezpečnejší)
+input int      InpMaxGridLevels  = 7;             // Max úrovní gridu (7 = ochrana)
+input double   InpTakeProfitPips = 20;            // TP v pipsoch
+input double   InpTotalTPPercent = 0.8;           // Celkový TP ako % zostatku
+
+//--- RISK MANAGEMENT
+input group "=== RIADENIE RIZIKA ==="
+input double   InpMaxDrawdownPct = 15.0;          // Max drawdown % (15 = bezpečné)
+input int      InpMagicNumber    = 2262642;       // Magické číslo
+
+//--- ČASOVÉ FILTRE (optimalizované pre AUDCAD)
 input group "=== ČASOVÉ FILTRE ==="
 input int      InpStartHour      = 0;             // Začiatok obchodovania
 input int      InpEndHour        = 23;            // Koniec obchodovania
-input bool     InpTradeFriday    = true;          // Obchodovať v piatok?
+input bool     InpTradeFriday    = false;         // Obchodovať v piatok? (false = bezpečnejšie)
 
-//--- Riadenie rizika
-input group "=== RIADENIE RIZIKA ==="
-input double   InpMaxDrawdownPct = 20.0;          // Max drawdown %
-input double   InpMaxLotSize     = 5.0;           // Max celková veľkosť lotov
-input int      InpMagicNumber    = 2262642;       // Magické číslo
-
-//--- Vstupné signály
+//--- VSTUPNÉ SIGNÁLY
 input group "=== VSTUPNÉ SIGNÁLY ==="
 input int      InpRSIPeriod      = 14;            // Perióda RSI
-input int      InpRSIOverbought  = 70;            // RSI prekúpená úroveň
-input int      InpRSIOversold    = 30;            // RSI prepredaná úroveň
+input int      InpRSIOverbought  = 65;            // RSI prekúpená (65 = citlivejšie)
+input int      InpRSIOversold    = 35;            // RSI prepredaná (35 = citlivejšie)
 input ENUM_TIMEFRAMES InpTimeframe = PERIOD_H1;   // Časový rámec
 
 //--- DISCORD MONITORING
@@ -173,19 +163,23 @@ int OnInit()
    //--- Notifikácia o štarte
    if(InpNotifyStart)
    {
+      double autoLot = CalculateLotSize(0);
+      string lotMode = InpAutoLot ? "AUTO" : "MANUAL";
       string startMsg =
          ":green_circle: **EA SPUSTENÝ**\n" +
          "```\n" +
          "Symbol:    " + symbol + "\n" +
          "Zostatok:  $" + DoubleToString(initialBalance, 2) + "\n" +
-         "Lot:       " + DoubleToString(InpLotSize, 2) + "\n" +
-         "Grid:      " + IntegerToString(InpGridStepPips) + " pips\n" +
+         "Lot mode:  " + lotMode + "\n" +
+         "Base lot:  " + DoubleToString(autoLot, 2) + "\n" +
+         "Grid:      " + IntegerToString(InpGridStepPips) + " pips x " + IntegerToString(InpMaxGridLevels) + " levels\n" +
+         "Risk:      " + DoubleToString(InpRiskPercent, 1) + "% per grid\n" +
          "Max DD:    " + DoubleToString(InpMaxDrawdownPct, 1) + "%\n" +
          "```";
       SendNotification_All("EA SPUSTENÝ", startMsg);
    }
 
-   Print("NoPain Grid EA v3 (Monitoring) inicializovaný");
+   Print("Claude Like NoPain EA v4.00 - AUTO OPTIMIZED - inicializovaný");
    return(INIT_SUCCEEDED);
 }
 
@@ -664,10 +658,13 @@ void UpdateGridInfo()
 bool OpenGridPosition(ENUM_ORDER_TYPE orderType, int level)
 {
    double lotSize = CalculateLotSize(level);
+   //--- Dynamický max lot limit (10% zostatku v margin)
+   double balance = AccountInfoDouble(ACCOUNT_BALANCE);
+   double maxTotalLots = balance / 1000.0;  // Cca 10% marginu pri páke 1:500
    double totalLots = GetTotalLots() + lotSize;
-   if(totalLots > InpMaxLotSize)
+   if(totalLots > maxTotalLots)
    {
-      Print("MAX LOTY: ", totalLots);
+      Print("MAX LOTY dosiahnuté: ", totalLots, " > ", maxTotalLots);
       return false;
    }
 
@@ -703,13 +700,50 @@ bool OpenGridPosition(ENUM_ORDER_TYPE orderType, int level)
 
 double CalculateLotSize(int level)
 {
-   double lots = InpLotSize;
+   double baseLot;
+
+   if(InpAutoLot)
+   {
+      //--- AUTO LOT: vypočítaj podľa zostatku a rizika
+      //--- Pre AUDCAD s pákou 1:500, grid 7 úrovní
+      //--- Vzorec: (balance * risk%) / (maxGridDrawdownPips * pipValue * lotMultiplierSum)
+      double balance = AccountInfoDouble(ACCOUNT_BALANCE);
+      double pipValue = SymbolInfoDouble(symbol, SYMBOL_TRADE_TICK_VALUE);
+
+      //--- Suma násobičov pre všetky úrovne (1 + 1.3 + 1.69 + ...)
+      double multiplierSum = 0;
+      double mult = 1.0;
+      for(int i = 0; i < InpMaxGridLevels; i++)
+      {
+         multiplierSum += mult;
+         mult *= InpLotMultiplier;
+      }
+
+      //--- Max potenciálny DD v pipsoch (všetky úrovne otvorené)
+      double maxDDPips = InpGridStepPips * InpMaxGridLevels;
+
+      //--- Bezpečný base lot
+      baseLot = (balance * InpRiskPercent / 100.0) / (maxDDPips * pipValue * multiplierSum);
+
+      //--- Pre páku 1:500 na IC Markets, min lot 0.01
+      baseLot = MathMax(0.01, baseLot);
+   }
+   else
+   {
+      baseLot = InpManualLot;
+   }
+
+   //--- Aplikuj násobič pre aktuálnu úroveň
+   double lots = baseLot;
    for(int i = 0; i < level; i++) lots *= InpLotMultiplier;
+
+   //--- Normalizuj na povolené hodnoty
    double minLot = SymbolInfoDouble(symbol, SYMBOL_VOLUME_MIN);
    double maxLot = SymbolInfoDouble(symbol, SYMBOL_VOLUME_MAX);
    double lotStep = SymbolInfoDouble(symbol, SYMBOL_VOLUME_STEP);
    lots = MathFloor(lots / lotStep) * lotStep;
    lots = MathMax(minLot, MathMin(maxLot, lots));
+
    return lots;
 }
 
